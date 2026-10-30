@@ -16,7 +16,8 @@
 Требуется Python 3.11+ и установленный [SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD).
 
 ```bash
-python -m pip install -e .
+python -m pip install -e ".[dev]"
+python -m pytest -q
 ```
 
 ## Использование

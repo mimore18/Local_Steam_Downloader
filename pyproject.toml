@@ -25,6 +25,9 @@ classifiers = [
 steam-workshop-dl = "steam_workshop_dl.ui.cli:main"
 steam-workshop-dl-gui = "steam_workshop_dl.ui.gui:main"
 
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
 [tool.setuptools.packages.find]
 include = ["steam_workshop_dl*"]
 
