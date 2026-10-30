@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Tests / tooling
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local-only project documentation
+Guide.md
+
+# Project runtime data
+steamcmd/
+steamapps/
+out/
+output/
+workshop/
+*.workshop-manifest.json
+*.log
+
+# SteamCMD caches and downloaded content
+ssfn*
+config/config.vdf

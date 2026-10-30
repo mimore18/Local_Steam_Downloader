@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "steam-workshop-dl"
+version = "0.1.0"
+description = "Cross-platform Steam Workshop collection downloader"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "mimore18" }]
+dependencies = []
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Environment :: Win32 (MS Windows)",
+    "Environment :: X11 Applications",
+    "Topic :: Utilities",
+]
+
+[project.scripts]
+steam-workshop-dl = "steam_workshop_dl.ui.cli:main"
+steam-workshop-dl-gui = "steam_workshop_dl.ui.gui:main"
+
+[tool.setuptools.packages.find]
+include = ["steam_workshop_dl*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
