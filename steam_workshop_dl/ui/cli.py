@@ -14,9 +14,9 @@ from pathlib import Path
 from .. import __version__
 from ..app.downloader import Downloader
 from ..app.resolver import Resolver
-from ..core.errors import WorkshopError
+from ..core.errors import WorkshopError, WrongTargetTypeError
 from ..core.events import Events
-from ..core.models import ItemStatus, NodeKind, Summary, WorkshopNode
+from ..core.models import ItemStatus, NodeKind, Settings, Summary, WorkshopNode
 from ..core.naming import human_size
 from ..services.config import (
     ConfigError,
@@ -176,6 +176,129 @@ def _build_settings(args: argparse.Namespace):
     if not merged.get("target"):
         raise WorkshopError("Не указана ссылка или ID.")
     return settings_from_mapping(merged)
+
+
+def _prompt(text: str, default: str = "") -> str:
+    """Read one line; ``default`` is used for an empty answer."""
+
+    try:
+        answer = input(text).strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        raise SystemExit(130) from None
+    return answer or default
+
+
+def _ask_type() -> str:
+    print("Тип скачиваемого объекта:")
+    print("  1 — коллекция")
+    print("  2 — отдельный мод")
+    while True:
+        answer = _prompt("Введите тип [1]: ", "1").casefold()
+        if answer in {"1", "collection", "коллекция", "к"}:
+            return "collection"
+        if answer in {"2", "mod", "мод", "м"}:
+            return "mod"
+        print("Не понял. Введите 1 (коллекция) или 2 (мод).")
+
+
+def _ask_target() -> str:
+    while True:
+        target = _prompt("Введите ссылку на объект (URL или ID): ")
+        if target:
+            return target
+        print("Ссылка не может быть пустой.")
+
+
+def _ask_output() -> Path:
+    default = default_output_dir()
+    answer = _prompt(f"Папка для скачивания [{default}]: ", str(default))
+    return Path(answer).expanduser()
+
+
+def _confirm(question: str) -> bool:
+    answer = _prompt(f"{question} [y/N]: ", "n").casefold()
+    return answer in {"y", "yes", "д", "да"}
+
+
+def interactive_main() -> int:
+    """Interactive wizard used by ``run_cli.py`` without arguments."""
+
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")  # type: ignore[union-attr]
+    setup_logging()
+
+    print()
+    print("=" * 52)
+    print(f"  Steam Workshop Downloader {__version__}")
+    print("=" * 52)
+    print()
+
+    target_type = _ask_type()
+    target = _ask_target()
+    output_dir = _ask_output()
+    print()
+
+    events = ConsoleEvents()
+    api = SteamAPI()
+    root: WorkshopNode | None = None
+
+    try:
+        while root is None:
+            try:
+                root = Resolver(api).resolve(target, target_type, events)
+            except WrongTargetTypeError as exc:
+                other = exc.actual_type
+                label = "коллекция" if other == "collection" else "мод"
+                print()
+                print(exc)
+                if _confirm(f"Переключить тип на «{label}» и продолжить?"):
+                    target_type = other
+                    continue
+                print("Отменено.")
+                return 2
+
+        print()
+        print("Список устанавливаемых модов:")
+        print()
+        print_tree(root)
+
+        available, selected = root.counts()
+        total_size = root.total_size(selected_only=True)
+        print()
+        print(f"Доступно модов: {available}, выбрано: {selected}, размер: {human_size(total_size)}")
+        print(f"Папка: {output_dir}")
+        print()
+
+        if available == 0:
+            print("Нет доступных для скачивания модов.")
+            return 1
+        if not _confirm("Скачать всё выбранное?"):
+            print("Отменено.")
+            return 0
+
+        settings = Settings(
+            target=target,
+            target_type=target_type,
+            output_dir=output_dir,
+            auth_mode="anonymous",
+        )
+        print()
+        summary = Downloader().run(settings, root=root, events=events)
+        print()
+        print(f"Итог: {summary.as_text()}")
+        print(f"Файлы: {output_dir}")
+        if summary.canceled:
+            return 130
+        return 0 if summary.ok else 1
+    except KeyboardInterrupt:
+        print()
+        log.warning("Отменено пользователем.")
+        return 130
+    except WorkshopError as exc:
+        print()
+        log.error("%s", exc)
+        return 2
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -22,6 +22,22 @@ python -m pytest -q
 
 ## Использование
 
+Из корня проекта:
+
+```bash
+# интерактивный мастер: тип → ссылка → список модов → y/n
+python3 run_cli.py
+
+# обычный CLI со всеми флагами
+python3 run_cli.py "https://steamcommunity.com/sharedfiles/filedetails/?id=123456789" --list
+python3 run_cli.py 123456789 --type collection --login USER
+
+# графический интерфейс
+python3 run_gui.py
+```
+
+Или через модуль/установленную команду:
+
 ```bash
 # посмотреть состав коллекции
 steam-workshop-dl "https://steamcommunity.com/sharedfiles/filedetails/?id=123456789" --list
@@ -37,6 +53,14 @@ steam-workshop-dl --gui
 ```
 
 Полный список флагов: `steam-workshop-dl --help`.
+
+### Интерактивный CLI
+
+`python3 run_cli.py` без аргументов показывает название и версию, спрашивает тип
+(коллекция или мод), ссылку и папку, выводит дерево модов и просит подтверждение
+`y/n`. Пустой ответ для типа — коллекция, для папки — путь по умолчанию;
+подтверждение по умолчанию — «нет». Вход в мастере анонимный, для аккаунта
+запускайте с аргументами: `python3 run_cli.py <ID> --login USER`.
 
 ### Графический интерфейс
 
