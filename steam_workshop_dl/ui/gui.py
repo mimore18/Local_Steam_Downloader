@@ -65,6 +65,9 @@ class GuiEvents:
     def tree_ready(self, root: WorkshopNode) -> None:
         self.messages.put(("tree", root))
 
+    def tree_updated(self, root: WorkshopNode) -> None:
+        self.messages.put(("tree_update", root))
+
     def metadata_updated(self, root: WorkshopNode) -> None:
         self.messages.put(("refresh",))
 
@@ -109,6 +112,7 @@ class App(tk.Tk):
 
         self._build()
         self.search.trace_add("write", lambda *_: self._apply_filter())
+        self.target_type.trace_add("write", lambda *_: self._clear_list())
         self.after(100, self._poll)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -143,17 +147,19 @@ class App(tk.Tk):
         choose_button.grid(row=2, column=2, padx=(8, 0), pady=(8, 0))
         self._busy_widgets.extend([output_entry, choose_button])
 
-        ttk.Label(top, text="SteamCMD:").grid(row=3, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(top, text="SteamCMD (необязательно):").grid(
+            row=3, column=0, sticky="w", pady=(8, 0)
+        )
         steamcmd_entry = ttk.Entry(top, textvariable=self.steamcmd)
         steamcmd_entry.grid(row=3, column=1, sticky="ew", pady=(8, 0))
         steamcmd_button = ttk.Button(
-            top, text="Найти…", command=self._choose_steamcmd
+            top, text="Указать…", command=self._choose_steamcmd
         )
         steamcmd_button.grid(row=3, column=2, padx=(8, 0), pady=(8, 0))
         self._busy_widgets.extend([steamcmd_entry, steamcmd_button])
         ttk.Label(
             top,
-            text="Оставьте пустым — программа найдёт SteamCMD автоматически.",
+            text="Необязательно. Если пусто, SteamCMD будет найден или скачан автоматически.",
             foreground="#666666",
         ).grid(row=4, column=1, columnspan=2, sticky="w")
 
@@ -417,6 +423,15 @@ class App(tk.Tk):
         size = self.root_node.total_size(selected_only=True)
         self.totals.set(f"Выбрано {selected} из {available} · {human_size(size)}")
 
+    def _clear_list(self) -> None:
+        if self._busy():
+            return
+        self.root_node = None
+        self.tree.clear()
+        self.progress.configure(value=0)
+        self.totals.set("Список не загружен")
+        self.status.set("Выберите тип и нажмите «Показать список»")
+
     def _apply_filter(self) -> None:
         self.tree.set_filter(self.search.get())
 
@@ -435,6 +450,10 @@ class App(tk.Tk):
         if kind == "log":
             self._log(message[1], message[2])
         elif kind == "tree":
+            self.root_node = message[1]
+            self.tree.populate(message[1])
+            self._update_totals()
+        elif kind == "tree_update":
             self.root_node = message[1]
             self.tree.populate(message[1])
             self._update_totals()

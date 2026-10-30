@@ -18,6 +18,8 @@ class Events(Protocol):
 
     def tree_ready(self, root: WorkshopNode) -> None: ...
 
+    def tree_updated(self, root: WorkshopNode) -> None: ...
+
     def metadata_updated(self, root: WorkshopNode) -> None: ...
 
     def item_status(self, item_id: str, status: ItemStatus, detail: str = "") -> None: ...
@@ -34,6 +36,9 @@ class NullEvents:
         pass
 
     def tree_ready(self, root: WorkshopNode) -> None:
+        pass
+
+    def tree_updated(self, root: WorkshopNode) -> None:
         pass
 
     def metadata_updated(self, root: WorkshopNode) -> None:

@@ -46,6 +46,9 @@ class ConsoleEvents:
     def tree_ready(self, root: WorkshopNode) -> None:
         pass
 
+    def tree_updated(self, root: WorkshopNode) -> None:
+        pass
+
     def metadata_updated(self, root: WorkshopNode) -> None:
         pass
 
@@ -338,7 +341,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.list:
             api = SteamAPI(timeout=settings.timeout)
             root = Resolver(api).resolve(
-                settings.target, settings.target_type, ConsoleEvents()
+                settings.target,
+                settings.target_type,
+                ConsoleEvents(),
+                workers=settings.metadata_workers,
             )
             print_tree(root)
             return 0

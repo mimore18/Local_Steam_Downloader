@@ -82,11 +82,18 @@ class CheckTree(ttk.Treeview):
 
     # ------------------------------------------------------------------ data
     def populate(self, root: WorkshopNode) -> None:
+        first_time = self._root is None or self._root.id != root.id
         self._root = root
         self._nodes = {node.id: node for node in root.walk()}
-        self._render(expand_all=True)
-        if self.exists(root.id):
+        self._render(expand_all=first_time)
+        if first_time and self.exists(root.id):
+            self.item(root.id, open=True)
             self.selection_set(root.id)
+
+    def clear(self) -> None:
+        self.delete(*self.get_children())
+        self._nodes.clear()
+        self._root = None
 
     def set_filter(self, text: str) -> None:
         """Show only items whose title or id contains *text* (and ancestors)."""

@@ -2,7 +2,7 @@ import pytest
 
 from steam_workshop_dl.app.resolver import Resolver
 from steam_workshop_dl.core.errors import InvalidTargetError, WrongTargetTypeError
-from steam_workshop_dl.core.models import NodeKind
+from steam_workshop_dl.core.models import ItemStatus, NodeKind
 from steam_workshop_dl.services.steam_api import (
     CollectionChild,
     CollectionInfo,
@@ -55,7 +55,9 @@ class FakeAPI:
         return {item_id: self.details[item_id] for item_id in ids if item_id in self.details}
 
     def get_collection(self, collection_id):
-        return self.collections[collection_id]
+        return self.collections.get(
+            collection_id, CollectionInfo(collection_id, 9, [])
+        )
 
 
 def test_resolve_collection_tree() -> None:
@@ -99,3 +101,58 @@ def test_resolve_single_mod() -> None:
 def test_resolve_missing_target() -> None:
     with pytest.raises(InvalidTargetError):
         Resolver(FakeAPI()).resolve("999", "collection")
+
+
+def test_collection_detected_by_collection_endpoint() -> None:
+    """Real API reports filetype=0 for collections; children still resolve."""
+
+    api = FakeAPI()
+    api.details["300"] = details("300", filetype=0, title="Modern Collection")
+    api.collections["300"] = CollectionInfo(
+        "300", 1, [CollectionChild("1", 0, 0)]
+    )
+
+    root = Resolver(api).resolve("300", "collection")
+    assert root.kind is NodeKind.COLLECTION
+    assert [child.id for child in root.children] == ["1"]
+
+    with pytest.raises(WrongTargetTypeError) as exc:
+        Resolver(api).resolve("300", "mod")
+    assert exc.value.actual_type == "collection"
+
+
+def test_broken_nested_collection_does_not_abort() -> None:
+    api = FakeAPI()
+    api.details["300"] = details("300", filetype=0, title="Modern Collection")
+    api.collections["300"] = CollectionInfo(
+        "300",
+        1,
+        [CollectionChild("1", 0, 0), CollectionChild("400", 1, 2)],
+    )
+
+    root = Resolver(api).resolve("300", "collection")
+    broken = next(child for child in root.children if child.id == "400")
+    assert broken.kind is NodeKind.ITEM
+    assert broken.selectable is False
+    assert broken.status is ItemStatus.UNAVAILABLE
+    assert [child.id for child in root.children] == ["1", "400"]
+
+
+def test_progressive_tree_events() -> None:
+    from steam_workshop_dl.core.events import NullEvents
+
+    class Recorder(NullEvents):
+        def __init__(self) -> None:
+            self.ready = 0
+            self.updated = 0
+
+        def tree_ready(self, root):
+            self.ready += 1
+
+        def tree_updated(self, root):
+            self.updated += 1
+
+    recorder = Recorder()
+    Resolver(FakeAPI()).resolve("100", "collection", recorder, workers=1)
+    assert recorder.ready == 1
+    assert recorder.updated >= 1

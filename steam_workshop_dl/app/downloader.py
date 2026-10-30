@@ -55,7 +55,12 @@ class Downloader:
         summary = Summary()
 
         if root is None:
-            root = Resolver(self.api).resolve(settings.target, settings.target_type, events)
+            root = Resolver(self.api).resolve(
+                settings.target,
+                settings.target_type,
+                events,
+                workers=settings.metadata_workers,
+            )
 
         summary.unavailable = sum(
             1 for node in root.items() if node.status is ItemStatus.UNAVAILABLE
