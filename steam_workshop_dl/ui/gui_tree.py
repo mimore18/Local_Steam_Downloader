@@ -71,7 +71,7 @@ class CheckTree(ttk.Treeview):
         self.tag_configure("done", foreground="#1b7f3b")
 
         self._nodes: dict[str, WorkshopNode] = {}
-        self._root: WorkshopNode | None = None
+        self._root_node: WorkshopNode | None = None
         self._on_change = on_change
         self._query = ""
 
@@ -82,8 +82,8 @@ class CheckTree(ttk.Treeview):
 
     # ------------------------------------------------------------------ data
     def populate(self, root: WorkshopNode) -> None:
-        first_time = self._root is None or self._root.id != root.id
-        self._root = root
+        first_time = self._root_node is None or self._root_node.id != root.id
+        self._root_node = root
         self._nodes = {node.id: node for node in root.walk()}
         self._render(expand_all=first_time)
         if first_time and self.exists(root.id):
@@ -93,7 +93,7 @@ class CheckTree(ttk.Treeview):
     def clear(self) -> None:
         self.delete(*self.get_children())
         self._nodes.clear()
-        self._root = None
+        self._root_node = None
 
     def set_filter(self, text: str) -> None:
         """Show only items whose title or id contains *text* (and ancestors)."""
@@ -113,9 +113,9 @@ class CheckTree(ttk.Treeview):
         }
         selected = self.focus()
         self.delete(*self.get_children())
-        if self._root is None:
+        if self._root_node is None:
             return
-        self._insert(self._root, "")
+        self._insert(self._root_node, "")
         if expand_all or self._query:
             for iid in list(self._nodes):
                 if self.exists(iid) and self._nodes[iid].kind is NodeKind.COLLECTION:
@@ -173,8 +173,8 @@ class CheckTree(ttk.Treeview):
     # ------------------------------------------------------------------ events
     def _toggle(self, node: WorkshopNode) -> None:
         toggle_selected(node)
-        if self._root is not None:
-            sync_collection_state(self._root)
+        if self._root_node is not None:
+            sync_collection_state(self._root_node)
         self.refresh()
         self._on_change()
 
@@ -204,9 +204,9 @@ class CheckTree(ttk.Treeview):
         return "break"
 
     def select_all(self, selected: bool) -> None:
-        if self._root is None:
+        if self._root_node is None:
             return
-        set_selected(self._root, selected)
+        set_selected(self._root_node, selected)
         self.refresh()
         self._on_change()
 
