@@ -84,6 +84,7 @@ class Settings:
     target_type: str = "collection"
     output_dir: Path = field(default_factory=lambda: Path.home() / "Downloads" / "workshop")
     steamcmd: Path | None = None
+    bootstrap_steamcmd: bool = True
     auth_mode: str = "anonymous"
     username: str | None = None
     validate: bool = False

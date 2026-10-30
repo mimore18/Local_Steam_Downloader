@@ -119,6 +119,9 @@ def settings_from_mapping(data: Mapping[str, Any]) -> Settings:
         target_type=str(pick("target_type", default="collection")),
         output_dir=Path(output).expanduser(),
         steamcmd=Path(steamcmd).expanduser() if steamcmd else None,
+        bootstrap_steamcmd=bool(
+            pick("bootstrap_steamcmd", "download_steamcmd", "steamcmd_bootstrap", default=True)
+        ),
         auth_mode=str(auth),
         username=pick("username"),
         validate=bool(pick("validate", default=False)),

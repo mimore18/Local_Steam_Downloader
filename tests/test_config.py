@@ -57,3 +57,9 @@ def test_settings_from_mapping() -> None:
     assert settings.username == "user"
     assert settings.zip_items is True
     assert settings.only == {"1", "2"}
+    assert settings.bootstrap_steamcmd is True
+
+
+def test_settings_bootstrap_can_be_disabled() -> None:
+    settings = settings_from_mapping({"bootstrap_steamcmd": False})
+    assert settings.bootstrap_steamcmd is False

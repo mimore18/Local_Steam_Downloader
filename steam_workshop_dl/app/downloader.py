@@ -25,11 +25,11 @@ from ..services.manifest import Manifest
 from ..services.steam_api import SteamAPI
 from ..services.steamcmd import (
     content_path,
-    find_steamcmd,
     parse_line,
     run_script,
     write_runscript,
 )
+from ..services.steamcmd_setup import ensure_steamcmd
 from .resolver import Resolver
 
 log = logging.getLogger(__name__)
@@ -98,7 +98,7 @@ class Downloader:
             events.finished(summary)
             return summary
 
-        steamcmd = find_steamcmd(settings.steamcmd)
+        steamcmd = ensure_steamcmd(settings, events)
         ensure_login(
             settings,
             prompter or ConsolePrompter(),

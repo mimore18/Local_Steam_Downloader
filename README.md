@@ -13,7 +13,9 @@
 
 ## Установка
 
-Требуется Python 3.11+ и установленный [SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD).
+Требуется Python 3.11+. SteamCMD устанавливать вручную не обязательно: при первом
+скачивании программа сама загрузит официальный архив Valve в папку `steamcmd/`
+рядом с проектом (или в пользовательский data-dir для установленного пакета).
 
 ```bash
 python -m pip install -e ".[dev]"
@@ -53,6 +55,20 @@ steam-workshop-dl --gui
 ```
 
 Полный список флагов: `steam-workshop-dl --help`.
+
+### SteamCMD
+
+Если SteamCMD не найден, он автоматически скачивается с официального сервера Valve
+и распаковывается:
+
+- в `<корень проекта>/steamcmd/` при запуске из исходников;
+- в `~/.local/share/steam-workshop-dl/steamcmd` (Linux) или
+  `%LOCALAPPDATA%\steam-workshop-dl\steamcmd` (Windows) для установленного пакета.
+
+Переопределить папку: `STEAM_WORKSHOP_STEAMCMD_DIR=/путь/к/steamcmd`.
+Отключить автозагрузку: `--no-steamcmd-bootstrap` или снять галочку в GUI.
+Свой путь задаётся через `--steamcmd /путь/к/steamcmd.sh`; неверный путь
+не запускает загрузку в другое место, а показывает ошибку.
 
 ### Интерактивный CLI
 

@@ -56,7 +56,7 @@ def test_run_respects_explicit_items(monkeypatch, tmp_path: Path) -> None:
     root = WorkshopNode(id="1", kind=NodeKind.COLLECTION, title="Collection")
     root.children = [first, second]
 
-    monkeypatch.setattr(downloader_module, "find_steamcmd", lambda _path: Path("/bin/true"))
+    monkeypatch.setattr(downloader_module, "ensure_steamcmd", lambda _settings, _events: Path("/bin/true"))
     monkeypatch.setattr(downloader_module, "ensure_login", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         Downloader,

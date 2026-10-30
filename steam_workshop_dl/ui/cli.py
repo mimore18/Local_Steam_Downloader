@@ -112,6 +112,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("-o", "--output", default=None, help="выходная папка")
     parser.add_argument("--steamcmd", default=None, help="путь к SteamCMD")
+    parser.add_argument(
+        "--no-steamcmd-bootstrap",
+        dest="bootstrap_steamcmd",
+        action="store_false",
+        default=None,
+        help="не скачивать SteamCMD автоматически, искать только локально",
+    )
     auth = parser.add_mutually_exclusive_group()
     auth.add_argument("--anonymous", action="store_true", default=None, help="анонимный вход")
     auth.add_argument("--login", metavar="USER", default=None, help="вход под аккаунтом")
@@ -142,6 +149,7 @@ def _cli_values(args: argparse.Namespace) -> dict[str, object]:
         "target_type": args.type,
         "output": args.output,
         "steamcmd": args.steamcmd,
+        "bootstrap_steamcmd": args.bootstrap_steamcmd,
         "validate": args.validate,
         "zip": args.zip_items,
         "by_app": args.by_app,

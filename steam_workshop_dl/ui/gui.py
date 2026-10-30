@@ -102,6 +102,7 @@ class App(tk.Tk):
         self.resume = tk.BooleanVar(value=True)
         self.validate = tk.BooleanVar(value=False)
         self.zip_items = tk.BooleanVar(value=False)
+        self.bootstrap_steamcmd = tk.BooleanVar(value=True)
         self.search = tk.StringVar()
         self.status = tk.StringVar(value="Готов к работе")
         self.totals = tk.StringVar(value="Список не загружен")
@@ -184,6 +185,7 @@ class App(tk.Tk):
             ("докачивать (resume)", self.resume),
             ("проверять файлы (validate)", self.validate),
             ("упаковывать в ZIP", self.zip_items),
+            ("скачать SteamCMD при необходимости", self.bootstrap_steamcmd),
         ):
             check = ttk.Checkbutton(options, text=text, variable=variable)
             check.pack(side="left", padx=(8, 0))
@@ -280,6 +282,7 @@ class App(tk.Tk):
             target_type=self.target_type.get(),
             output_dir=Path(self.output.get()).expanduser(),
             steamcmd=Path(steamcmd).expanduser() if steamcmd else None,
+            bootstrap_steamcmd=self.bootstrap_steamcmd.get(),
             auth_mode=self.auth_mode.get(),
             username=username or None,
             resume=self.resume.get(),
