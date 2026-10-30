@@ -44,6 +44,7 @@ class Downloader:
         settings: Settings,
         *,
         root: WorkshopNode | None = None,
+        items: list[WorkshopNode] | None = None,
         events: Events | None = None,
         prompter: Prompter | None = None,
         cancel: threading.Event | None = None,
@@ -59,7 +60,9 @@ class Downloader:
         summary.unavailable = sum(
             1 for node in root.items() if node.status is ItemStatus.UNAVAILABLE
         )
-        items = selected_items(root, only=settings.only, exclude=settings.exclude)
+        items = items if items is not None else selected_items(
+            root, only=settings.only, exclude=settings.exclude
+        )
         if not items:
             summary.elapsed = time.monotonic() - started
             events.finished(summary)
