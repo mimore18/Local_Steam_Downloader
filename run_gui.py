@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import sys
-
 
 def main() -> int:
     from steam_workshop_dl.ui.gui import main as gui_main
