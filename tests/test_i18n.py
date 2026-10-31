@@ -190,3 +190,66 @@ def test_gui_remembers_saved_language(app) -> None:
         assert second.show_button.cget("text") == "Load mod list"
     finally:
         second.destroy()
+
+
+def test_gui_theme_switch_and_persistence(app) -> None:
+    from steam_workshop_dl.ui.theme import PALETTES
+
+    instance, config_dir = app
+    assert instance.theme.get() == "light"
+
+    instance._open_settings()
+    dialog = next(
+        widget
+        for widget in instance.winfo_children()
+        if isinstance(widget, tk.Toplevel)
+    )
+    combos = [
+        widget for widget in _walk(dialog) if isinstance(widget, tk.ttk.Combobox)
+    ]
+    assert len(combos) == 2
+    combos[1].set("Тёмная")
+    save = next(
+        widget
+        for widget in _walk(dialog)
+        if isinstance(widget, tk.ttk.Button)
+        and widget.cget("text") in {"Сохранить", "Save"}
+    )
+    save.invoke()
+    instance.update()
+
+    assert instance.theme.get() == "dark"
+    assert instance.log_text.cget("background").lower() == PALETTES["dark"]["field"]
+    assert str(instance.github_link.cget("foreground")) == PALETTES["dark"]["link"]
+
+    preferences = config_dir / "steam-workshop-dl" / "gui.json"
+    assert '"theme": "dark"' in preferences.read_text(encoding="utf-8")
+
+
+def test_footer_is_packed_before_the_expanding_split(app) -> None:
+    instance, _ = app
+    footer = instance.github_link.master
+    slaves = instance.pack_slaves()
+    assert footer.pack_info()["side"] == "bottom"
+    assert slaves.index(footer) < slaves.index(instance.split)
+    assert isinstance(instance.split, tk.ttk.Panedwindow)
+
+
+def test_gui_remembers_saved_theme(app) -> None:
+    import json
+
+    from steam_workshop_dl.ui.gui import App
+    from steam_workshop_dl.ui.theme import PALETTES
+
+    _, config_dir = app
+    path = config_dir / "steam-workshop-dl" / "gui.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"theme": "dark"}), encoding="utf-8")
+
+    second = App()
+    second.withdraw()
+    try:
+        assert second.theme.get() == "dark"
+        assert second.log_text.cget("background").lower() == PALETTES["dark"]["field"]
+    finally:
+        second.destroy()

@@ -24,11 +24,15 @@ A simple Steam Workshop downloader with a GUI and a CLI:
 
 ### Screenshots
 
-English interface:
+English interface, light theme:
 
 ![Main window](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/main-en.png)
 
 ![Settings window](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/settings-en.png)
+
+Dark theme:
+
+![Main window in the dark theme](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/main-en-dark.png)
 
 ### Download a ready build
 
@@ -90,6 +94,7 @@ How to use it:
 The **“Settings…”** button contains:
 
 - **Interface language** — English / Русский;
+- **Theme** — Light / Dark;
 - Steam authorization;
 - SteamCMD path;
 - download options (resume, validate, ZIP).
@@ -99,6 +104,9 @@ Other buttons:
 - **“Retry failed”** — retry only failed or canceled downloads;
 - **“Select all” / “Clear selection”** — manage checkboxes;
 - **“Stop download”** — cancel the current operation.
+
+Drag the divider between the mod list and the log to make the list smaller.
+The GitHub link stays visible when the window is resized.
 
 ### Start the CLI without arguments
 
@@ -195,6 +203,14 @@ In the GUI open **“Settings…” → “Interface” → “Interface languag
 - The choice is remembered in `gui.json` and restored on the next launch.
 - Error dialogs and log messages are translated too.
 
+### Theme
+
+In the GUI open **“Settings…” → “Interface” → “Theme”**.
+
+- Available themes: **Light** and **Dark**.
+- The dark theme recolours the window, mod list, log and dialogs.
+- The choice is stored in `gui.json` and restored on the next launch.
+
 ### SteamCMD
 
 You do not need to install SteamCMD manually. If it is missing, the app downloads
@@ -235,11 +251,15 @@ corresponding checkbox in the settings.
 
 ### Скриншоты
 
-Английский интерфейс:
+Английский интерфейс, светлая тема:
 
 ![Главное окно программы](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/main-en.png)
 
 ![Окно настроек](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/settings-en.png)
+
+Тёмная тема:
+
+![Главное окно в тёмной теме](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/main-en-dark.png)
 
 ### Скачивание готовой сборки
 
@@ -301,6 +321,7 @@ steam-workshop-dl-gui
 Кнопка **«Настройки…»** открывает:
 
 - **Язык интерфейса** — English / Русский;
+- **Тема** — светлая / тёмная;
 - авторизацию Steam;
 - путь к SteamCMD;
 - параметры загрузки (resume, validate, ZIP).
@@ -310,6 +331,9 @@ steam-workshop-dl-gui
 - **«Повторить неудачные»** — только ошибки и отменённые загрузки;
 - **«Выбрать все» / «Снять выделение»** — работа с галочками;
 - **«Остановить загрузку»** — прервать текущую операцию.
+
+Перетащите разделитель между списком модов и логом, чтобы уменьшить список.
+Ссылка на GitHub остаётся видимой при изменении размера окна.
 
 ### Запуск CLI без параметров
 
@@ -405,6 +429,14 @@ python run_cli.py 123456789 --login МОЙ_ЛОГИН
 - По умолчанию выбирается основной язык ОС.
 - Выбор запоминается в `gui.json` и применяется при следующем запуске.
 - Сообщения об ошибках и строки лога тоже переводятся.
+
+### Тема
+
+В GUI откройте **«Настройки…» → «Интерфейс» → «Тема»**.
+
+- Доступны **светлая** и **тёмная** темы.
+- Тёмная тема меняет оформление окна, списка модов, лога и диалогов.
+- Выбор запоминается в `gui.json` и применяется при следующем запуске.
 
 ### SteamCMD
 

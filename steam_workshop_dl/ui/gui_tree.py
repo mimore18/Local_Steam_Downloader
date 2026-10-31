@@ -169,6 +169,13 @@ class CheckTree(ttk.Treeview):
         self._update_headings()
         self.refresh()
 
+    def apply_palette(self, colors: dict[str, str]) -> None:
+        """Recolour status tags for the active light/dark theme."""
+
+        self.tag_configure("unavailable", foreground=colors["unavailable"])
+        self.tag_configure("failed", foreground=colors["failed"])
+        self.tag_configure("done", foreground=colors["done"])
+
     def _label(self, node: WorkshopNode) -> str:
         title = node.title or translate(
             self.language, "item_placeholder", id=node.id

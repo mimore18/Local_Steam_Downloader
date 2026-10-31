@@ -30,6 +30,7 @@ from .i18n import (
     translate,
     translate_message,
 )
+from .theme import DEFAULT_THEME, apply_theme, normalize_theme, style_text
 
 RETRYABLE = {ItemStatus.FAILED, ItemStatus.CANCELED}
 PROJECT_URL = "https://github.com/mimore18/Local_Steam_Downloader"
@@ -110,10 +111,12 @@ class App(tk.Tk):
         self._status_key = "ready"
         self._status_values: dict[str, object] = {}
 
-        saved_language = normalize_language(
-            load_gui_preferences().get("language")
-        )
+        preferences = load_gui_preferences()
+        saved_language = normalize_language(preferences.get("language"))
         self.language = tk.StringVar(value=saved_language or system_language())
+        saved_theme = normalize_theme(preferences.get("theme"))
+        self.theme = tk.StringVar(value=saved_theme or DEFAULT_THEME)
+        self._colors = apply_theme(self, self.theme.get())
         self.target = tk.StringVar()
         self.output = tk.StringVar(value=str(Path.home() / "Downloads" / "workshop"))
         self.steamcmd = tk.StringVar()
@@ -128,6 +131,7 @@ class App(tk.Tk):
         self.totals = tk.StringVar(value=self.t("list_not_loaded"))
 
         self._build()
+        self._apply_theme_widgets()
         self.target_type.trace_add("write", lambda *_: self._clear_list())
         self.after(100, self._poll)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -225,9 +229,32 @@ class App(tk.Tk):
         )
         top.columnconfigure(1, weight=1)
 
-        tree_frame = ttk.Frame(self, padding=(10, 6, 10, 0))
-        tree_frame.pack(fill="both", expand=True)
+        # Fixed strips are packed before the expanding area, so the footer
+        # (the GitHub link) is never clipped when the window is resized down.
+        footer = ttk.Frame(self, padding=(10, 0, 10, 8))
+        footer.pack(side="bottom", fill="x")
+        self.github_link = ttk.Label(
+            footer,
+            text="GitHub: github.com/mimore18/Local_Steam_Downloader",
+            foreground="#0b5cad",
+            cursor="hand2",
+        )
+        self.github_link.pack(side="left")
+        self.github_link.bind("<Button-1>", lambda _event: self._open_github())
 
+        bottom = ttk.Frame(self, padding=10)
+        bottom.pack(side="bottom", fill="x")
+        ttk.Label(bottom, textvariable=self.status).pack(side="left")
+        self.progress = ttk.Progressbar(bottom, length=260, mode="determinate")
+        self.progress.pack(side="right")
+
+        # A draggable sash lets the user shrink the mod list and give more
+        # room to the log instead of forcing a tall window.
+        split = ttk.Panedwindow(self, orient="vertical")
+        split.pack(fill="both", expand=True)
+        self.split = split
+
+        tree_frame = ttk.Frame(split, padding=(10, 6, 10, 0))
         totals_bar = ttk.Frame(tree_frame)
         totals_bar.pack(fill="x", pady=(0, 6))
         self._translated(ttk.Label(totals_bar), "mod_list").pack(side="left")
@@ -244,33 +271,19 @@ class App(tk.Tk):
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+        split.add(tree_frame, weight=3)
 
-        bottom = ttk.Frame(self, padding=10)
-        bottom.pack(fill="x")
-        ttk.Label(bottom, textvariable=self.status).pack(side="left")
-        self.progress = ttk.Progressbar(bottom, length=260, mode="determinate")
-        self.progress.pack(side="right")
-
+        log_outer = ttk.Frame(split)
         log_frame = self._translated(
-            ttk.LabelFrame(self, padding=6), "log", option="text"
+            ttk.LabelFrame(log_outer, padding=6), "log", option="text"
         )
-        log_frame.pack(fill="both", expand=False, padx=10, pady=(0, 10))
+        log_frame.pack(fill="both", expand=True, padx=10, pady=(6, 10))
         self.log_text = tk.Text(log_frame, height=7, state="disabled", wrap="word")
         log_scroll = ttk.Scrollbar(log_frame, orient="vertical", command=self.log_text.yview)
         self.log_text.configure(yscrollcommand=log_scroll.set)
         self.log_text.pack(side="left", fill="both", expand=True)
         log_scroll.pack(side="right", fill="y")
-
-        footer = ttk.Frame(self, padding=(10, 0, 10, 8))
-        footer.pack(fill="x")
-        self.github_link = ttk.Label(
-            footer,
-            text="GitHub: github.com/mimore18/Local_Steam_Downloader",
-            foreground="#0b5cad",
-            cursor="hand2",
-        )
-        self.github_link.pack(side="left")
-        self.github_link.bind("<Button-1>", lambda _event: self._open_github())
+        split.add(log_outer, weight=1)
 
     # ------------------------------------------------------------------ input
     def _choose_output(self) -> None:
@@ -294,6 +307,7 @@ class App(tk.Tk):
         t = self.t
         dialog = tk.Toplevel(self)
         dialog.title(t("settings_title"))
+        dialog.configure(background=self._colors["bg"])
         dialog.transient(self)
         dialog.resizable(False, False)
 
@@ -317,6 +331,25 @@ class App(tk.Tk):
             width=16,
         )
         combo.pack(side="left", padx=(8, 0))
+
+        theme_row = ttk.Frame(interface)
+        theme_row.pack(fill="x", pady=(8, 0))
+        ttk.Label(theme_row, text=t("theme")).pack(side="left")
+        theme_names = [t("theme_light"), t("theme_dark")]
+        theme_codes = {
+            t("theme_light"): "light",
+            t("theme_dark"): "dark",
+        }
+        theme_name = tk.StringVar(
+            value=t("theme_dark" if self.theme.get() == "dark" else "theme_light")
+        )
+        ttk.Combobox(
+            theme_row,
+            textvariable=theme_name,
+            values=theme_names,
+            state="readonly",
+            width=16,
+        ).pack(side="left", padx=(8, 0))
 
         steam = ttk.LabelFrame(body, text=t("steamcmd"), padding=8)
         steam.pack(fill="x", pady=(10, 0))
@@ -394,11 +427,24 @@ class App(tk.Tk):
 
         def save() -> None:
             code = codes.get(language_name.get(), self.language.get())
+            chosen_theme = theme_codes.get(theme_name.get(), self.theme.get())
+            changed = False
             if code != self.language.get():
                 self.language.set(code)
                 self._apply_language()
+                changed = True
+            if chosen_theme != self.theme.get():
+                self.theme.set(chosen_theme)
+                self._apply_theme()
+                changed = True
+            if changed:
                 try:
-                    save_gui_preferences({"language": code})
+                    save_gui_preferences(
+                        {
+                            "language": self.language.get(),
+                            "theme": self.theme.get(),
+                        }
+                    )
                 except OSError:
                     pass
             dialog.destroy()
@@ -561,6 +607,15 @@ class App(tk.Tk):
         self._render_log()
         self._update_totals()
         self._refresh_status()
+
+    def _apply_theme(self) -> None:
+        self._colors = apply_theme(self, self.theme.get())
+        self._apply_theme_widgets()
+
+    def _apply_theme_widgets(self) -> None:
+        self.tree.apply_palette(self._colors)
+        style_text(self.log_text, self._colors)
+        self.github_link.configure(foreground=self._colors["link"])
 
     def _set_busy(self, busy: bool, key: str, **values: object) -> None:
         self._set_status(key, **values)
