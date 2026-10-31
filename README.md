@@ -22,6 +22,14 @@
 > Скачивается только тот контент, к которому у аккаунта есть доступ.
 > Проект не обходит приватность и ограничения Steam.
 
+### Скриншоты
+
+Английский интерфейс:
+
+![Главное окно программы](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/main-en.png)
+
+![Окно настроек](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/settings-en.png)
+
 ### Скачивание готовой сборки
 
 Самый простой способ — взять готовый архив со страницы
@@ -222,6 +230,14 @@ A simple Steam Workshop downloader with a GUI and a CLI:
 
 > Only content available to the signed-in account can be downloaded.
 > This project does not bypass Steam privacy or access restrictions.
+
+### Screenshots
+
+English interface:
+
+![Main window](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/main-en.png)
+
+![Settings window](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/settings-en.png)
 
 ### Download a ready build
 

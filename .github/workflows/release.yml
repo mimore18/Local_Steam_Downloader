@@ -46,6 +46,10 @@ jobs:
           body: |
             ## Local Steam Downloader ${{ github.ref_name }}
 
+            ![Main window](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/main-en.png)
+
+            ![Settings window](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/settings-en.png)
+
             ### Русский
 
             **Windows 10/11:** `steam-workshop-dl-windows-x64.zip` содержит
