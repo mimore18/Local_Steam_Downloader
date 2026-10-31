@@ -50,18 +50,6 @@ jobs:
 
             ![Settings window](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/settings-en.png)
 
-            ### Русский
-
-            **Windows 10/11:** `steam-workshop-dl-windows-x64.zip` содержит
-            `steam-workshop-dl.exe` (CLI) и `steam-workshop-dl-gui.exe` (GUI).
-            Распакуйте и запустите нужный файл — Python не требуется.
-
-            **Linux:** `steam-workshop-dl-linux-source.tar.gz` содержит исходники
-            на Python. Распакуйте, установите Python 3.11+ и запустите
-            `python3 run_gui.py` или `python3 run_cli.py`.
-
-            Подробнее — в [README](https://github.com/mimore18/Local_Steam_Downloader#readme).
-
             ### English
 
             **Windows 10/11:** `steam-workshop-dl-windows-x64.zip` contains
@@ -73,6 +61,18 @@ jobs:
             `python3 run_gui.py` or `python3 run_cli.py`.
 
             See the [README](https://github.com/mimore18/Local_Steam_Downloader#readme) for details.
+
+            ### Русский
+
+            **Windows 10/11:** `steam-workshop-dl-windows-x64.zip` содержит
+            `steam-workshop-dl.exe` (CLI) и `steam-workshop-dl-gui.exe` (GUI).
+            Распакуйте и запустите нужный файл — Python не требуется.
+
+            **Linux:** `steam-workshop-dl-linux-source.tar.gz` содержит исходники
+            на Python. Распакуйте, установите Python 3.11+ и запустите
+            `python3 run_gui.py` или `python3 run_cli.py`.
+
+            Подробнее — в [README](https://github.com/mimore18/Local_Steam_Downloader#readme).
           files: steam-workshop-dl-windows-x64.zip
           fail_on_unmatched_files: true
           overwrite_files: true
