@@ -106,12 +106,10 @@ class App(tk.Tk):
         self.validate = tk.BooleanVar(value=False)
         self.zip_items = tk.BooleanVar(value=False)
         self.bootstrap_steamcmd = tk.BooleanVar(value=True)
-        self.search = tk.StringVar()
         self.status = tk.StringVar(value="Готов к работе")
         self.totals = tk.StringVar(value="Список не загружен")
 
         self._build()
-        self.search.trace_add("write", lambda *_: self._apply_filter())
         self.target_type.trace_add("write", lambda *_: self._clear_list())
         self.after(100, self._poll)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -124,123 +122,81 @@ class App(tk.Tk):
         ttk.Label(top, text="Тип:").grid(row=0, column=0, sticky="w")
         types = ttk.Frame(top)
         types.grid(row=0, column=1, columnspan=2, sticky="w", padx=(8, 0))
-        self._busy_widgets.append(
-            ttk.Radiobutton(
-                types, text="Коллекция", value="collection", variable=self.target_type
+        for text, value in (("Коллекция", "collection"), ("Мод", "mod")):
+            radio = ttk.Radiobutton(
+                types, text=text, value=value, variable=self.target_type
             )
-        )
-        self._busy_widgets.append(
-            ttk.Radiobutton(types, text="Мод", value="mod", variable=self.target_type)
-        )
-        for widget in self._busy_widgets[-2:]:
-            widget.pack(side="left", padx=(0, 12))
+            radio.pack(side="left", padx=(0, 12))
+            self._busy_widgets.append(radio)
 
         ttk.Label(top, text="Ссылка/ID:").grid(row=1, column=0, sticky="w", pady=(8, 0))
         target_entry = ttk.Entry(top, textvariable=self.target)
         target_entry.grid(row=1, column=1, columnspan=2, sticky="ew", pady=(8, 0))
         self._busy_widgets.append(target_entry)
 
-        ttk.Label(top, text="Куда:").grid(row=2, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(top, text="Папка загрузки:").grid(
+            row=2, column=0, sticky="w", pady=(8, 0)
+        )
         output_entry = ttk.Entry(top, textvariable=self.output)
         output_entry.grid(row=2, column=1, sticky="ew", pady=(8, 0))
-        choose_button = ttk.Button(top, text="Выбрать", command=self._choose_output)
+        choose_button = ttk.Button(
+            top, text="Выбрать папку…", command=self._choose_output
+        )
         choose_button.grid(row=2, column=2, padx=(8, 0), pady=(8, 0))
         self._busy_widgets.extend([output_entry, choose_button])
 
-        ttk.Label(top, text="SteamCMD (необязательно):").grid(
-            row=3, column=0, sticky="w", pady=(8, 0)
-        )
-        steamcmd_entry = ttk.Entry(top, textvariable=self.steamcmd)
-        steamcmd_entry.grid(row=3, column=1, sticky="ew", pady=(8, 0))
-        steamcmd_button = ttk.Button(
-            top, text="Указать…", command=self._choose_steamcmd
-        )
-        steamcmd_button.grid(row=3, column=2, padx=(8, 0), pady=(8, 0))
-        self._busy_widgets.extend([steamcmd_entry, steamcmd_button])
-        ttk.Label(
-            top,
-            text="Необязательно. Если пусто, SteamCMD будет найден или скачан автоматически.",
-            foreground="#666666",
-        ).grid(row=4, column=1, columnspan=2, sticky="w")
-
-        auth = ttk.Frame(top)
-        auth.grid(row=5, column=0, columnspan=3, sticky="w", pady=(8, 0))
-        ttk.Label(auth, text="Авторизация:").pack(side="left")
-        anon = ttk.Radiobutton(
-            auth, text="Анонимно", value="anonymous", variable=self.auth_mode
-        )
-        anon.pack(side="left", padx=(8, 0))
-        login = ttk.Radiobutton(
-            auth, text="Аккаунт Steam", value="login", variable=self.auth_mode
-        )
-        login.pack(side="left", padx=(12, 0))
-        ttk.Label(auth, text="Логин:").pack(side="left", padx=(12, 0))
-        username_entry = ttk.Entry(auth, textvariable=self.username, width=20)
-        username_entry.pack(side="left", padx=(6, 0))
-        self._busy_widgets.extend([anon, login, username_entry])
-        ttk.Label(
-            auth,
-            text="пароль и Steam Guard спросит в отдельном окне",
-            foreground="#666666",
-        ).pack(side="left", padx=(10, 0))
-
-        options = ttk.Frame(top)
-        options.grid(row=6, column=0, columnspan=3, sticky="w", pady=(8, 0))
-        ttk.Label(options, text="Параметры:").pack(side="left")
-        for text, variable in (
-            ("докачивать (resume)", self.resume),
-            ("проверять файлы (validate)", self.validate),
-            ("упаковывать в ZIP", self.zip_items),
-            ("скачать SteamCMD при необходимости", self.bootstrap_steamcmd),
-        ):
-            check = ttk.Checkbutton(options, text=text, variable=variable)
-            check.pack(side="left", padx=(8, 0))
-            self._busy_widgets.append(check)
-
         actions = ttk.Frame(top)
-        actions.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(10, 0))
+        actions.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(12, 0))
         self.show_button = ttk.Button(
-            actions, text="Показать список", command=self._show_list
+            actions, text="Загрузить список модов", command=self._show_list
         )
         self.show_button.pack(side="left")
         self.download_button = ttk.Button(
-            actions, text="Скачать выбранное", command=self._download
+            actions, text="Скачать выбранные моды", command=self._download
         )
         self.download_button.pack(side="left", padx=(8, 0))
         self.retry_button = ttk.Button(
-            actions, text="Повторить ошибки", command=self._retry_failed
+            actions, text="Повторить неудачные", command=self._retry_failed
         )
         self.retry_button.pack(side="left", padx=(8, 0))
-        select_all = ttk.Button(
-            actions, text="Выбрать все", command=lambda: self.tree.select_all(True)
-        )
-        select_all.pack(side="left", padx=(8, 0))
-        select_none = ttk.Button(
-            actions, text="Снять все", command=lambda: self.tree.select_all(False)
-        )
-        select_none.pack(side="left", padx=(8, 0))
         self.cancel_button = ttk.Button(
-            actions, text="Отмена", command=self._cancel, state="disabled"
+            actions, text="Остановить загрузку", command=self._cancel, state="disabled"
         )
         self.cancel_button.pack(side="right")
+
+        secondary = ttk.Frame(top)
+        secondary.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(8, 0))
+        select_all = ttk.Button(
+            secondary, text="Выделить все", command=lambda: self.tree.select_all(True)
+        )
+        select_all.pack(side="left")
+        select_none = ttk.Button(
+            secondary, text="Снять выделение", command=lambda: self.tree.select_all(False)
+        )
+        select_none.pack(side="left", padx=(8, 0))
+        self.settings_button = ttk.Button(
+            secondary, text="Настройки…", command=self._open_settings
+        )
+        self.settings_button.pack(side="right")
         self._busy_widgets.extend(
-            [self.show_button, self.download_button, self.retry_button,
-             select_all, select_none]
+            [
+                self.show_button,
+                self.download_button,
+                self.retry_button,
+                select_all,
+                select_none,
+                self.settings_button,
+            ]
         )
         top.columnconfigure(1, weight=1)
 
-        tree_frame = ttk.Frame(self, padding=(10, 0, 10, 0))
+        tree_frame = ttk.Frame(self, padding=(10, 6, 10, 0))
         tree_frame.pack(fill="both", expand=True)
 
-        search_bar = ttk.Frame(tree_frame)
-        search_bar.pack(fill="x", pady=(0, 6))
-        ttk.Label(search_bar, text="Поиск:").pack(side="left")
-        search_entry = ttk.Entry(search_bar, textvariable=self.search)
-        search_entry.pack(side="left", fill="x", expand=True, padx=(8, 0))
-        ttk.Button(
-            search_bar, text="Сбросить", command=lambda: self.search.set("")
-        ).pack(side="left", padx=(8, 0))
-        ttk.Label(search_bar, textvariable=self.totals).pack(side="right", padx=(12, 0))
+        totals_bar = ttk.Frame(tree_frame)
+        totals_bar.pack(fill="x", pady=(0, 6))
+        ttk.Label(totals_bar, text="Список модов").pack(side="left")
+        ttk.Label(totals_bar, textvariable=self.totals).pack(side="right")
 
         tree_area = ttk.Frame(tree_frame)
         tree_area.pack(fill="both", expand=True)
@@ -279,6 +235,102 @@ class App(tk.Tk):
         )
         if chosen:
             self.steamcmd.set(chosen)
+
+    def _open_settings(self) -> None:
+        if self._busy():
+            return
+        dialog = tk.Toplevel(self)
+        dialog.title("Настройки")
+        dialog.transient(self)
+        dialog.resizable(False, False)
+
+        body = ttk.Frame(dialog, padding=12)
+        body.pack(fill="both", expand=True)
+
+        steam = ttk.LabelFrame(body, text="SteamCMD", padding=8)
+        steam.pack(fill="x")
+        steam_row = ttk.Frame(steam)
+        steam_row.pack(fill="x")
+        ttk.Label(steam_row, text="Путь к SteamCMD:").pack(side="left")
+        steam_entry = ttk.Entry(steam_row, textvariable=self.steamcmd, width=46)
+        steam_entry.pack(side="left", fill="x", expand=True, padx=(8, 0))
+        ttk.Button(
+            steam_row, text="Указать файл…", command=self._choose_steamcmd
+        ).pack(side="left", padx=(8, 0))
+        ttk.Checkbutton(
+            steam,
+            text="Скачивать SteamCMD автоматически, если он не найден",
+            variable=self.bootstrap_steamcmd,
+        ).pack(anchor="w", pady=(8, 0))
+        ttk.Label(
+            steam,
+            text="Если путь пуст, SteamCMD будет найден или скачан автоматически.",
+            foreground="#666666",
+        ).pack(anchor="w")
+
+        auth = ttk.LabelFrame(body, text="Авторизация Steam", padding=8)
+        auth.pack(fill="x", pady=(10, 0))
+        auth_row = ttk.Frame(auth)
+        auth_row.pack(fill="x")
+        ttk.Radiobutton(
+            auth_row,
+            text="Анонимно",
+            value="anonymous",
+            variable=self.auth_mode,
+        ).pack(side="left")
+        ttk.Radiobutton(
+            auth_row,
+            text="Аккаунт Steam",
+            value="login",
+            variable=self.auth_mode,
+        ).pack(side="left", padx=(16, 0))
+        user_row = ttk.Frame(auth)
+        user_row.pack(fill="x", pady=(8, 0))
+        ttk.Label(user_row, text="Логин:").pack(side="left")
+        ttk.Entry(user_row, textvariable=self.username, width=28).pack(
+            side="left", padx=(8, 0)
+        )
+        ttk.Label(
+            auth,
+            text="Пароль и код Steam Guard будут запрошены при загрузке.",
+            foreground="#666666",
+        ).pack(anchor="w", pady=(6, 0))
+
+        options = ttk.LabelFrame(body, text="Параметры загрузки", padding=8)
+        options.pack(fill="x", pady=(10, 0))
+        for text, variable in (
+            ("Докачивать недокачанное (resume)", self.resume),
+            ("Проверять файлы после загрузки (validate)", self.validate),
+            ("Упаковывать каждый мод в ZIP", self.zip_items),
+        ):
+            ttk.Checkbutton(options, text=text, variable=variable).pack(anchor="w")
+
+        variables = (
+            self.steamcmd,
+            self.bootstrap_steamcmd,
+            self.auth_mode,
+            self.username,
+            self.resume,
+            self.validate,
+            self.zip_items,
+        )
+        before = [(variable, variable.get()) for variable in variables]
+
+        def cancel() -> None:
+            for variable, value in before:
+                variable.set(value)
+            dialog.destroy()
+
+        ttk.Button(body, text="Отмена", command=cancel).pack(
+            side="right", pady=(12, 0)
+        )
+        ttk.Button(body, text="Сохранить", command=dialog.destroy).pack(
+            side="right", padx=(0, 8), pady=(12, 0)
+        )
+
+        dialog.protocol("WM_DELETE_WINDOW", cancel)
+        dialog.grab_set()
+        dialog.focus_set()
 
     def _settings(self) -> Settings:
         steamcmd = self.steamcmd.get().strip()
@@ -430,10 +482,7 @@ class App(tk.Tk):
         self.tree.clear()
         self.progress.configure(value=0)
         self.totals.set("Список не загружен")
-        self.status.set("Выберите тип и нажмите «Показать список»")
-
-    def _apply_filter(self) -> None:
-        self.tree.set_filter(self.search.get())
+        self.status.set("Выберите тип и нажмите «Загрузить список модов»")
 
     # ------------------------------------------------------------------ event pump
     def _poll(self) -> None:
