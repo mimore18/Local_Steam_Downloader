@@ -22,6 +22,31 @@
 > Скачивается только тот контент, к которому у аккаунта есть доступ.
 > Проект не обходит приватность и ограничения Steam.
 
+### Скачивание готовой сборки
+
+Самый простой способ — взять готовый архив со страницы
+[Releases](https://github.com/mimore18/Local_Steam_Downloader/releases/latest):
+
+| Система | Файл | Что внутри |
+|---|---|---|
+| Windows 10/11 | [`steam-workshop-dl-windows-x64.zip`](https://github.com/mimore18/Local_Steam_Downloader/releases/latest/download/steam-workshop-dl-windows-x64.zip) | `steam-workshop-dl.exe` (CLI) и `steam-workshop-dl-gui.exe` (GUI), собранные PyInstaller |
+| Linux | [`steam-workshop-dl-linux-source.tar.gz`](https://github.com/mimore18/Local_Steam_Downloader/releases/latest/download/steam-workshop-dl-linux-source.tar.gz) | исходники на Python (`.py`) |
+
+**Windows.** Распакуйте ZIP и запустите нужный `.exe`. Python и установка
+пакета не нужны. Windows может показать предупреждение SmartScreen — это
+нормально для неподписанного exe, выберите «Подробнее → Выполнить в любом случае».
+
+**Linux.** Распакуйте архив, установите Python 3.11+ и запустите:
+
+```bash
+tar -xzf steam-workshop-dl-linux-source.tar.gz
+cd steam-workshop-dl-0.1.0
+python3 run_gui.py      # графический интерфейс
+python3 run_cli.py      # командная строка / мастер
+```
+
+Ниже описана установка из исходников вручную.
+
 ### Установка
 
 Нужен Python 3.11 или новее.
@@ -197,6 +222,31 @@ A simple Steam Workshop downloader with a GUI and a CLI:
 
 > Only content available to the signed-in account can be downloaded.
 > This project does not bypass Steam privacy or access restrictions.
+
+### Download a ready build
+
+The easiest way is to grab a ready archive from the
+[Releases](https://github.com/mimore18/Local_Steam_Downloader/releases/latest) page:
+
+| System | File | Contents |
+|---|---|---|
+| Windows 10/11 | [`steam-workshop-dl-windows-x64.zip`](https://github.com/mimore18/Local_Steam_Downloader/releases/latest/download/steam-workshop-dl-windows-x64.zip) | `steam-workshop-dl.exe` (CLI) and `steam-workshop-dl-gui.exe` (GUI), built with PyInstaller |
+| Linux | [`steam-workshop-dl-linux-source.tar.gz`](https://github.com/mimore18/Local_Steam_Downloader/releases/latest/download/steam-workshop-dl-linux-source.tar.gz) | Python source code (`.py`) |
+
+**Windows.** Unzip the archive and run the `.exe` you need. Python and package
+installation are not required. Windows may show a SmartScreen warning — this is
+normal for an unsigned exe; choose “More info → Run anyway”.
+
+**Linux.** Extract the archive, install Python 3.11+, and run:
+
+```bash
+tar -xzf steam-workshop-dl-linux-source.tar.gz
+cd steam-workshop-dl-0.1.0
+python3 run_gui.py      # graphical interface
+python3 run_cli.py      # command line / wizard
+```
+
+Installing from source manually is described below.
 
 ### Installation
 

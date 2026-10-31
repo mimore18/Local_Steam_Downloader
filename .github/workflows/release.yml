@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyInstaller
+        run: python -m pip install --upgrade pip pyinstaller
+
+      - name: Build CLI executable
+        run: >-
+          pyinstaller --noconfirm --clean --onefile
+          --name steam-workshop-dl --paths . run_cli.py
+
+      - name: Build GUI executable
+        run: >-
+          pyinstaller --noconfirm --clean --onefile --windowed
+          --name steam-workshop-dl-gui --paths . run_gui.py
+
+      - name: Create Windows archive
+        shell: pwsh
+        run: |
+          Copy-Item README.md dist/README.md
+          Compress-Archive `
+            -Path dist/steam-workshop-dl.exe,dist/steam-workshop-dl-gui.exe,dist/README.md `
+            -DestinationPath steam-workshop-dl-windows-x64.zip
+
+      - name: Create release with Windows archive
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Local Steam Downloader ${{ github.ref_name }}"
+          body: |
+            ## Local Steam Downloader ${{ github.ref_name }}
+
+            ### Русский
+
+            **Windows 10/11:** `steam-workshop-dl-windows-x64.zip` содержит
+            `steam-workshop-dl.exe` (CLI) и `steam-workshop-dl-gui.exe` (GUI).
+            Распакуйте и запустите нужный файл — Python не требуется.
+
+            **Linux:** `steam-workshop-dl-linux-source.tar.gz` содержит исходники
+            на Python. Распакуйте, установите Python 3.11+ и запустите
+            `python3 run_gui.py` или `python3 run_cli.py`.
+
+            Подробнее — в [README](https://github.com/mimore18/Local_Steam_Downloader#readme).
+
+            ### English
+
+            **Windows 10/11:** `steam-workshop-dl-windows-x64.zip` contains
+            `steam-workshop-dl.exe` (CLI) and `steam-workshop-dl-gui.exe` (GUI).
+            Unzip and run the file you need — Python is not required.
+
+            **Linux:** `steam-workshop-dl-linux-source.tar.gz` contains the Python
+            source code. Extract it, install Python 3.11+, and run
+            `python3 run_gui.py` or `python3 run_cli.py`.
+
+            See the [README](https://github.com/mimore18/Local_Steam_Downloader#readme) for details.
+          files: steam-workshop-dl-windows-x64.zip
+          fail_on_unmatched_files: true
+          overwrite_files: true
+
+  linux-source:
+    needs: windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Linux source archive
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          folder="steam-workshop-dl-${version}"
+          mkdir -p "staging/${folder}"
+          cp -r run_cli.py run_gui.py pyproject.toml README.md \
+            steam_workshop_dl "staging/${folder}/"
+          find staging -type d -name __pycache__ -prune -exec rm -rf {} +
+          tar -czf steam-workshop-dl-linux-source.tar.gz -C staging "${folder}"
+
+      - name: Upload Linux source archive
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: steam-workshop-dl-linux-source.tar.gz
+          fail_on_unmatched_files: true
+          overwrite_files: true
