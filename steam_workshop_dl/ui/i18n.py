@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import locale
 import os
+import re
 
 from collections.abc import Mapping
 
@@ -270,3 +271,169 @@ def translate(language: str | None, key: str, /, **values: object) -> str:
     if template is None:
         template = MESSAGES[DEFAULT_LANGUAGE].get(key, key)
     return template.format(**values) if values else template
+
+
+# The core and services raise ready-made Russian diagnostics.  The GUI cannot
+# change their language without a large refactor, so known messages are mapped
+# here at the display boundary.  New messages simply stay as-is until added.
+_EN_EXACT: dict[str, str] = {
+    "Steam API вернул неожиданный JSON": "Steam API returned unexpected JSON",
+    "Steam API не вернул данные коллекции": (
+        "Steam API did not return collection data"
+    ),
+    "Steam API не вернул детали предметов": (
+        "Steam API did not return item details"
+    ),
+    "SteamCMD не найден. Укажите --steamcmd или переменную STEAMCMD_PATH.": (
+        "SteamCMD not found. Specify --steamcmd or the STEAMCMD_PATH variable."
+    ),
+    "SteamCMD не найден. Установите его вручную, укажите --steamcmd "
+    "или включите автоматическую загрузку.": (
+        "SteamCMD not found. Install it manually, specify --steamcmd, "
+        "or enable automatic download."
+    ),
+    "Для входа под аккаунтом нужен username.": (
+        "An account login requires a username."
+    ),
+    "Истекло время ожидания входа в Steam.": "Steam login timed out.",
+    "Ввод кода Steam Guard отменён.": "Steam Guard code entry was canceled.",
+    "Ввод пароля отменён.": "Password entry was canceled.",
+    "SteamCMD не подтвердил вход. Проверьте логин/пароль/Guard.": (
+        "SteamCMD did not confirm the login. "
+        "Check the login, password and Guard code."
+    ),
+    "SteamCMD: анонимный вход и проверка обновлений…": (
+        "SteamCMD: anonymous login and update check…"
+    ),
+    "SteamCMD: вход выполнен.": "SteamCMD: logged in.",
+    "SteamCMD: вход выполнен, сессия закэширована.": (
+        "SteamCMD: logged in, session cached."
+    ),
+    "SteamCMD: распаковка архива…": "SteamCMD: extracting the archive…",
+    "уже скачано": "already downloaded",
+    "нет папки после SteamCMD": "no folder after SteamCMD",
+    "отменено": "canceled",
+}
+
+_EN_RULES: list[tuple[re.Pattern[str], str]] = [
+    (
+        re.compile(
+            r"Не удалось извлечь ID из ссылки\. Ожидается "
+            r"\.\.\.filedetails/\?id=123 или 123\."
+        ),
+        "Could not extract an ID from the link. "
+        "Expected ...filedetails/?id=123 or 123.",
+    ),
+    (
+        re.compile(r"Предмет/коллекция (?P<id>\S+) не найдена или недоступна\."),
+        "Item/collection {id} was not found or is unavailable.",
+    ),
+    (
+        re.compile(r"Достигнут лимит вложенности на (?P<id>.+?)\."),
+        "Nesting limit reached at {id}.",
+    ),
+    (
+        re.compile(r"Вложенная коллекция (?P<id>\S+) недоступна: (?P<error>.+)"),
+        "Nested collection {id} is unavailable: {error}",
+    ),
+    (
+        re.compile(
+            r"Элемент (?P<id>\S+) помечен как коллекция, но ею не является\."
+        ),
+        "Item {id} is marked as a collection but is not one.",
+    ),
+    (
+        re.compile(r"SteamCMD не запустился: (?P<error>.+)"),
+        "SteamCMD failed to start: {error}",
+    ),
+    (
+        re.compile(r"Steam API вернул HTTP (?P<code>\d+)"),
+        "Steam API returned HTTP {code}",
+    ),
+    (
+        re.compile(r"Steam API недоступен: (?P<error>.+)"),
+        "Steam API is unavailable: {error}",
+    ),
+    (
+        re.compile(
+            r"Повтор для (?P<count>\d+) предметов "
+            r"\(попытка (?P<attempt>\d+)\)\."
+        ),
+        "Retrying {count} items (attempt {attempt}).",
+    ),
+    (
+        re.compile(r"Не удалось скачать SteamCMD: (?P<error>.+)"),
+        "Failed to download SteamCMD: {error}",
+    ),
+    (
+        re.compile(r"Архив SteamCMD содержит небезопасный путь: (?P<name>.+)"),
+        "SteamCMD archive contains an unsafe path: {name}",
+    ),
+    (
+        re.compile(
+            r"Архив SteamCMD распакован, но (?P<name>\S+) "
+            r"не найден в (?P<folder>.+?)\."
+        ),
+        "SteamCMD archive was extracted, but {name} "
+        "was not found in {folder}.",
+    ),
+    (
+        re.compile(
+            r"Указанный SteamCMD не найден: (?P<path>.+?)\. "
+            r"Исправьте --steamcmd или уберите его, "
+            r"чтобы скачать автоматически\."
+        ),
+        "The specified SteamCMD was not found: {path}. "
+        "Fix --steamcmd or leave it empty to download automatically.",
+    ),
+    (
+        re.compile(r"Анонимный вход не удался: (?P<tail>.+)"),
+        "Anonymous login failed: {tail}",
+    ),
+    (
+        re.compile(r"SteamCMD закрыл stdin: (?P<error>.+)"),
+        "SteamCMD closed stdin: {error}",
+    ),
+    (
+        re.compile(r"SteamCMD: вход под аккаунтом (?P<username>.+?)…"),
+        "SteamCMD: logging in as {username}…",
+    ),
+    (
+        re.compile(r"SteamCMD: используется (?P<path>.+)"),
+        "SteamCMD: using {path}",
+    ),
+    (
+        re.compile(r"SteamCMD не найден\. Скачивание: (?P<url>.+)"),
+        "SteamCMD not found. Downloading: {url}",
+    ),
+    (
+        re.compile(r"SteamCMD будет установлен в: (?P<folder>.+)"),
+        "SteamCMD will be installed to: {folder}",
+    ),
+    (
+        re.compile(r"SteamCMD готов: (?P<path>.+)"),
+        "SteamCMD ready: {path}",
+    ),
+]
+
+
+def translate_message(language: str | None, message: str) -> str:
+    """Translate a ready-made service diagnostic when English is selected."""
+
+    if normalize_language(language) != "en":
+        return message
+    text = message.strip()
+    exact = _EN_EXACT.get(text)
+    if exact is not None:
+        return exact
+    for pattern, template in _EN_RULES:
+        match = pattern.fullmatch(text)
+        if match is None:
+            continue
+        values = {
+            key: translate_message("en", value)
+            for key, value in match.groupdict().items()
+        }
+        return template.format(**values)
+    return message
+

@@ -14,6 +14,7 @@ from steam_workshop_dl.ui.i18n import (
     normalize_language,
     system_language,
     translate,
+    translate_message,
 )
 
 
@@ -49,6 +50,34 @@ def test_translate_known_and_fallback() -> None:
 
 def test_language_names_cover_translations() -> None:
     assert set(LANGUAGE_NAMES) == {"en", "ru"}
+
+
+def test_translate_runtime_messages() -> None:
+    assert translate_message(
+        "en", "Предмет/коллекция 123 не найдена или недоступна."
+    ) == "Item/collection 123 was not found or is unavailable."
+    assert translate_message(
+        "en", "Steam API вернул HTTP 500"
+    ) == "Steam API returned HTTP 500"
+    assert translate_message(
+        "en",
+        "Анонимный вход не удался: ERROR! No subscription",
+    ) == "Anonymous login failed: ERROR! No subscription"
+    assert translate_message(
+        "en",
+        "Вложенная коллекция 42 недоступна: Steam API недоступен: timeout",
+    ) == (
+        "Nested collection 42 is unavailable: "
+        "Steam API is unavailable: timeout"
+    )
+    assert translate_message(
+        "en", "SteamCMD: вход выполнен."
+    ) == "SteamCMD: logged in."
+    # Russian UI keeps the original diagnostic untouched.
+    original = "Предмет/коллекция 123 не найдена или недоступна."
+    assert translate_message("ru", original) == original
+    # Unknown messages are left as-is.
+    assert translate_message("en", "custom failure") == "custom failure"
 
 
 def test_gui_preferences_roundtrip(tmp_path) -> None:

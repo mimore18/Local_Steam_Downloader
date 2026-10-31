@@ -23,7 +23,13 @@ from ..core.tree import selected_items
 from ..services.config import load_gui_preferences, save_gui_preferences
 from ..services.steam_api import SteamAPI
 from .gui_tree import CheckTree
-from .i18n import LANGUAGE_NAMES, normalize_language, system_language, translate
+from .i18n import (
+    LANGUAGE_NAMES,
+    normalize_language,
+    system_language,
+    translate,
+    translate_message,
+)
 
 RETRYABLE = {ItemStatus.FAILED, ItemStatus.CANCELED}
 PROJECT_URL = "https://github.com/mimore18/Local_Steam_Downloader"
@@ -642,7 +648,10 @@ class App(tk.Tk):
             self.worker = None
             self._set_busy(False, "status_error")
             self._log("error", message[1])
-            messagebox.showerror(self.t("error_title"), message[1])
+            messagebox.showerror(
+                self.t("error_title"),
+                translate_message(self.language.get(), message[1]),
+            )
 
     def _handle_prompt(self, request: PromptRequest) -> None:
         try:
@@ -710,6 +719,7 @@ class App(tk.Tk):
             )
 
     def _log(self, level: str, message: str) -> None:
+        message = translate_message(self.language.get(), message)
         self.log_text.configure(state="normal")
         self.log_text.insert("end", f"[{level}] {message}\n")
         self.log_text.see("end")
