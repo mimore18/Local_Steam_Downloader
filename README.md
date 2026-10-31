@@ -2,7 +2,9 @@
 
 Download Steam Workshop collections and individual mods through the official SteamCMD.
 
-[English](#english) · [Русский](#русский) · [GitHub](https://github.com/mimore18/Local_Steam_Downloader)
+[**⬇ Download for Windows 10/11**](https://github.com/mimore18/Local_Steam_Downloader/releases/latest/download/steam-workshop-dl-windows-x64.zip)
+
+[English](#english) · [Русский](#русский) · [Releases](https://github.com/mimore18/Local_Steam_Downloader/releases) · [GitHub](https://github.com/mimore18/Local_Steam_Downloader)
 
 ---
 
@@ -22,13 +24,7 @@ A simple Steam Workshop downloader with a GUI and a CLI:
 > Only content available to the signed-in account can be downloaded.
 > This project does not bypass Steam privacy or access restrictions.
 
-### Screenshots
-
-English interface, light theme:
-
-![Main window](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/main-en.png)
-
-![Settings window](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/settings-en.png)
+### Screenshot
 
 Dark theme:
 
@@ -52,7 +48,7 @@ normal for an unsigned exe; choose “More info → Run anyway”.
 
 ```bash
 tar -xzf steam-workshop-dl-linux-source.tar.gz
-cd steam-workshop-dl-0.1.0
+cd steam-workshop-dl
 python3 run_gui.py      # graphical interface
 python3 run_cli.py      # command line / wizard
 ```
@@ -249,13 +245,7 @@ corresponding checkbox in the settings.
 > Скачивается только тот контент, к которому у аккаунта есть доступ.
 > Проект не обходит приватность и ограничения Steam.
 
-### Скриншоты
-
-Английский интерфейс, светлая тема:
-
-![Главное окно программы](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/main-en.png)
-
-![Окно настроек](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/settings-en.png)
+### Скриншот
 
 Тёмная тема:
 
@@ -279,7 +269,7 @@ corresponding checkbox in the settings.
 
 ```bash
 tar -xzf steam-workshop-dl-linux-source.tar.gz
-cd steam-workshop-dl-0.1.0
+cd steam-workshop-dl
 python3 run_gui.py      # графический интерфейс
 python3 run_cli.py      # командная строка / мастер
 ```

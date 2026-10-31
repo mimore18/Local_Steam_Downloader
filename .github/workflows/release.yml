@@ -46,9 +46,9 @@ jobs:
           body: |
             ## Local Steam Downloader ${{ github.ref_name }}
 
-            ![Main window](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/main-en.png)
+            [**⬇ Download for Windows 10/11**](https://github.com/mimore18/Local_Steam_Downloader/releases/download/${{ github.ref_name }}/steam-workshop-dl-windows-x64.zip)
 
-            ![Settings window](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/settings-en.png)
+            ![Main window in the dark theme](https://raw.githubusercontent.com/mimore18/Local_Steam_Downloader/main/docs/screenshots/main-en-dark.png)
 
             ### English
 
@@ -85,8 +85,7 @@ jobs:
 
       - name: Build Linux source archive
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          folder="steam-workshop-dl-${version}"
+          folder="steam-workshop-dl"
           mkdir -p "staging/${folder}"
           cp -r run_cli.py run_gui.py pyproject.toml README.md \
             steam_workshop_dl "staging/${folder}/"
