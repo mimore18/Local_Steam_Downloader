@@ -1,6 +1,6 @@
 # Local Steam Downloader
 
-Скачивание коллекций и отдельных модов Steam Workshop через официальный SteamCMD.
+Download Steam Workshop collections and individual mods through the official SteamCMD.
 
 [English](#english) · [Русский](#русский) · [GitHub](https://github.com/mimore18/Local_Steam_Downloader)
 
