@@ -106,6 +106,7 @@ class App(tk.Tk):
         self.cancel = threading.Event()
         self._busy_widgets: list[tk.Widget] = []
         self._translatable: list[tuple[tk.Widget, str, str]] = []
+        self._log_entries: list[tuple[str, str]] = []
         self._status_key = "ready"
         self._status_values: dict[str, object] = {}
 
@@ -535,7 +536,7 @@ class App(tk.Tk):
 
     def _cancel(self) -> None:
         self.cancel.set()
-        self._log("info", self.t("cancel_requested"))
+        self._log("info", "cancel_requested")
         self.cancel_button.configure(state="disabled")
 
     # ------------------------------------------------------------------ state
@@ -557,6 +558,7 @@ class App(tk.Tk):
             except tk.TclError:
                 pass
         self.tree.set_language(self.language.get())
+        self._render_log()
         self._update_totals()
         self._refresh_status()
 
@@ -719,9 +721,22 @@ class App(tk.Tk):
             )
 
     def _log(self, level: str, message: str) -> None:
-        message = translate_message(self.language.get(), message)
+        self._log_entries.append((level, message))
         self.log_text.configure(state="normal")
-        self.log_text.insert("end", f"[{level}] {message}\n")
+        self.log_text.insert(
+            "end", f"[{level}] {translate_message(self.language.get(), message)}\n"
+        )
+        self.log_text.see("end")
+        self.log_text.configure(state="disabled")
+
+    def _render_log(self) -> None:
+        self.log_text.configure(state="normal")
+        self.log_text.delete("1.0", "end")
+        for level, message in self._log_entries:
+            self.log_text.insert(
+                "end",
+                f"[{level}] {translate_message(self.language.get(), message)}\n",
+            )
         self.log_text.see("end")
         self.log_text.configure(state="disabled")
 

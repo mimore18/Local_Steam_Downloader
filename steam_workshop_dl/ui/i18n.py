@@ -420,6 +420,9 @@ _EN_RULES: list[tuple[re.Pattern[str], str]] = [
 def translate_message(language: str | None, message: str) -> str:
     """Translate a ready-made service diagnostic when English is selected."""
 
+    # Internal log entries may pass a translation key instead of a message.
+    if message in MESSAGES[DEFAULT_LANGUAGE]:
+        return translate(language, message)
     if normalize_language(language) != "en":
         return message
     text = message.strip()

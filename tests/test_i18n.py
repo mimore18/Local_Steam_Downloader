@@ -76,6 +76,11 @@ def test_translate_runtime_messages() -> None:
     # Russian UI keeps the original diagnostic untouched.
     original = "Предмет/коллекция 123 не найдена или недоступна."
     assert translate_message("ru", original) == original
+    # Internal log entries may pass a translation key.
+    assert translate_message("en", "cancel_requested") == (
+        "Cancellation requested…"
+    )
+    assert translate_message("ru", "ready") == "Готов к работе"
     # Unknown messages are left as-is.
     assert translate_message("en", "custom failure") == "custom failure"
 
