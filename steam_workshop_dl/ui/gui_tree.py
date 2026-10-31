@@ -17,15 +17,16 @@ from typing import Callable
 from ..core.models import ItemStatus, NodeKind, WorkshopNode
 from ..core.naming import human_size
 from ..core.tree import set_selected, sync_collection_state, toggle_selected
+from .i18n import translate
 
-STATUS_TEXT = {
-    ItemStatus.PENDING: "Ожидает",
-    ItemStatus.DOWNLOADING: "Скачивается…",
-    ItemStatus.DONE: "Готово",
-    ItemStatus.SKIPPED: "Пропущено",
-    ItemStatus.FAILED: "Ошибка",
-    ItemStatus.UNAVAILABLE: "Недоступен",
-    ItemStatus.CANCELED: "Отменено",
+STATUS_KEYS = {
+    ItemStatus.PENDING: "status_pending",
+    ItemStatus.DOWNLOADING: "status_downloading_item",
+    ItemStatus.DONE: "status_done_item",
+    ItemStatus.SKIPPED: "status_skipped",
+    ItemStatus.FAILED: "status_failed",
+    ItemStatus.UNAVAILABLE: "status_unavailable",
+    ItemStatus.CANCELED: "status_canceled",
 }
 
 CHECKBOX_HIT_WIDTH = 28
@@ -53,16 +54,19 @@ def _matches(node: WorkshopNode, query: str) -> bool:
 
 
 class CheckTree(ttk.Treeview):
-    def __init__(self, master: tk.Misc, on_change: Callable[[], None]) -> None:
+    def __init__(
+        self,
+        master: tk.Misc,
+        on_change: Callable[[], None],
+        *,
+        language: str = "en",
+    ) -> None:
         super().__init__(
             master,
             columns=("size", "status"),
             show="tree headings",
             selectmode="browse",
         )
-        self.heading("#0", text="Название")
-        self.heading("size", text="Размер")
-        self.heading("status", text="Статус")
         self.column("#0", width=520, minwidth=260)
         self.column("size", width=100, anchor="e", stretch=False)
         self.column("status", width=120, anchor="w", stretch=False)
@@ -74,6 +78,8 @@ class CheckTree(ttk.Treeview):
         self._root_node: WorkshopNode | None = None
         self._on_change = on_change
         self._query = ""
+        self.language = language
+        self._update_headings()
 
         self.bind("<Button-1>", self._on_click)
         self.bind("<space>", self._on_space)
@@ -151,14 +157,29 @@ class CheckTree(ttk.Treeview):
             self._insert(child, node.id)
 
     # ------------------------------------------------------------------ render
-    @staticmethod
-    def _label(node: WorkshopNode) -> str:
-        return f"{glyph(node)} {node.title or f'item {node.id}'} [{node.id}]"
+    def _update_headings(self) -> None:
+        self.heading("#0", text=translate(self.language, "column_name"))
+        self.heading("size", text=translate(self.language, "column_size"))
+        self.heading("status", text=translate(self.language, "column_status"))
 
-    @staticmethod
-    def _values(node: WorkshopNode) -> tuple[str, str]:
-        size = human_size(node.size) if node.kind is NodeKind.ITEM else ""
-        return size, STATUS_TEXT.get(node.status, "")
+    def set_language(self, language: str) -> None:
+        if language == self.language:
+            return
+        self.language = language
+        self._update_headings()
+        self.refresh()
+
+    def _label(self, node: WorkshopNode) -> str:
+        title = node.title or translate(
+            self.language, "item_placeholder", id=node.id
+        )
+        return f"{glyph(node)} {title} [{node.id}]"
+
+    def _values(self, node: WorkshopNode) -> tuple[str, str]:
+        size = human_size(node.size, language=self.language) if node.kind is NodeKind.ITEM else ""
+        status_key = STATUS_KEYS.get(node.status)
+        status = translate(self.language, status_key) if status_key else ""
+        return size, status
 
     @staticmethod
     def _tags(node: WorkshopNode) -> tuple[str, ...]:

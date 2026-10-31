@@ -6,6 +6,7 @@ Passwords are deliberately absent from the schema.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tomllib
@@ -43,6 +44,39 @@ def default_config_path() -> Path:
     else:
         base = _env_path("XDG_CONFIG_HOME") or Path.home() / ".config"
     return base / APP_NAME / "config.toml"
+
+
+def default_gui_config_path() -> Path:
+    """Small JSON file for GUI-only preferences such as the language."""
+
+    return default_config_path().with_name("gui.json")
+
+
+def load_gui_preferences(path: Path | None = None) -> dict[str, Any]:
+    """Read GUI preferences; missing or broken file yields an empty mapping."""
+
+    preferences_path = path or default_gui_config_path()
+    try:
+        data = json.loads(preferences_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def save_gui_preferences(
+    data: Mapping[str, Any], path: Path | None = None
+) -> Path:
+    """Merge scalar GUI preferences into the JSON file and return its path."""
+
+    preferences_path = path or default_gui_config_path()
+    merged = load_gui_preferences(preferences_path)
+    merged.update(data)
+    preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    preferences_path.write_text(
+        json.dumps(merged, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return preferences_path
 
 
 def default_log_path() -> Path:

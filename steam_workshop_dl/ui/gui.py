@@ -19,8 +19,10 @@ from ..core.errors import WorkshopError, WrongTargetTypeError
 from ..core.models import ItemStatus, Settings, Summary, WorkshopNode
 from ..core.naming import human_size
 from ..core.tree import selected_items
+from ..services.config import load_gui_preferences, save_gui_preferences
 from ..services.steam_api import SteamAPI
 from .gui_tree import CheckTree
+from .i18n import LANGUAGE_NAMES, normalize_language, system_language, translate
 
 RETRYABLE = {ItemStatus.FAILED, ItemStatus.CANCELED}
 
@@ -95,7 +97,14 @@ class App(tk.Tk):
         self.worker: threading.Thread | None = None
         self.cancel = threading.Event()
         self._busy_widgets: list[tk.Widget] = []
+        self._translatable: list[tuple[tk.Widget, str, str]] = []
+        self._status_key = "ready"
+        self._status_values: dict[str, object] = {}
 
+        saved_language = normalize_language(
+            load_gui_preferences().get("language")
+        )
+        self.language = tk.StringVar(value=saved_language or system_language())
         self.target = tk.StringVar()
         self.output = tk.StringVar(value=str(Path.home() / "Downloads" / "workshop"))
         self.steamcmd = tk.StringVar()
@@ -106,8 +115,8 @@ class App(tk.Tk):
         self.validate = tk.BooleanVar(value=False)
         self.zip_items = tk.BooleanVar(value=False)
         self.bootstrap_steamcmd = tk.BooleanVar(value=True)
-        self.status = tk.StringVar(value="Готов к работе")
-        self.totals = tk.StringVar(value="Список не загружен")
+        self.status = tk.StringVar(value=self.t("ready"))
+        self.totals = tk.StringVar(value=self.t("list_not_loaded"))
 
         self._build()
         self.target_type.trace_add("write", lambda *_: self._clear_list())
@@ -115,67 +124,84 @@ class App(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     # ------------------------------------------------------------------ layout
+    def t(self, key: str, **values: object) -> str:
+        return translate(self.language.get(), key, **values)
+
+    def _translated(self, widget, key: str, option: str = "text"):
+        widget.configure(**{option: self.t(key)})
+        self._translatable.append((widget, key, option))
+        return widget
+
     def _build(self) -> None:
         top = ttk.Frame(self, padding=10)
         top.pack(fill="x")
 
-        ttk.Label(top, text="Тип:").grid(row=0, column=0, sticky="w")
+        self._translated(ttk.Label(top), "type").grid(row=0, column=0, sticky="w")
         types = ttk.Frame(top)
         types.grid(row=0, column=1, columnspan=2, sticky="w", padx=(8, 0))
-        for text, value in (("Коллекция", "collection"), ("Мод", "mod")):
-            radio = ttk.Radiobutton(
-                types, text=text, value=value, variable=self.target_type
+        for key, value in (("collection", "collection"), ("mod", "mod")):
+            radio = self._translated(
+                ttk.Radiobutton(types, value=value, variable=self.target_type),
+                key,
             )
             radio.pack(side="left", padx=(0, 12))
             self._busy_widgets.append(radio)
 
-        ttk.Label(top, text="Ссылка/ID:").grid(row=1, column=0, sticky="w", pady=(8, 0))
+        self._translated(ttk.Label(top), "target").grid(
+            row=1, column=0, sticky="w", pady=(8, 0)
+        )
         target_entry = ttk.Entry(top, textvariable=self.target)
         target_entry.grid(row=1, column=1, columnspan=2, sticky="ew", pady=(8, 0))
         self._busy_widgets.append(target_entry)
 
-        ttk.Label(top, text="Папка загрузки:").grid(
+        self._translated(ttk.Label(top), "output").grid(
             row=2, column=0, sticky="w", pady=(8, 0)
         )
         output_entry = ttk.Entry(top, textvariable=self.output)
         output_entry.grid(row=2, column=1, sticky="ew", pady=(8, 0))
-        choose_button = ttk.Button(
-            top, text="Выбрать папку…", command=self._choose_output
+        choose_button = self._translated(
+            ttk.Button(top, command=self._choose_output), "choose_output"
         )
         choose_button.grid(row=2, column=2, padx=(8, 0), pady=(8, 0))
         self._busy_widgets.extend([output_entry, choose_button])
 
         actions = ttk.Frame(top)
         actions.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(12, 0))
-        self.show_button = ttk.Button(
-            actions, text="Загрузить список модов", command=self._show_list
+        self.show_button = self._translated(
+            ttk.Button(actions, command=self._show_list), "load_list"
         )
         self.show_button.pack(side="left")
-        self.download_button = ttk.Button(
-            actions, text="Скачать выбранные моды", command=self._download
+        self.download_button = self._translated(
+            ttk.Button(actions, command=self._download), "download_selected"
         )
         self.download_button.pack(side="left", padx=(8, 0))
-        self.retry_button = ttk.Button(
-            actions, text="Повторить неудачные", command=self._retry_failed
+        self.retry_button = self._translated(
+            ttk.Button(actions, command=self._retry_failed), "retry_failed"
         )
         self.retry_button.pack(side="left", padx=(8, 0))
-        self.cancel_button = ttk.Button(
-            actions, text="Остановить загрузку", command=self._cancel, state="disabled"
+        self.cancel_button = self._translated(
+            ttk.Button(actions, command=self._cancel, state="disabled"), "stop"
         )
         self.cancel_button.pack(side="right")
 
         secondary = ttk.Frame(top)
         secondary.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(8, 0))
-        select_all = ttk.Button(
-            secondary, text="Выделить все", command=lambda: self.tree.select_all(True)
+        select_all = self._translated(
+            ttk.Button(
+                secondary, command=lambda: self.tree.select_all(True)
+            ),
+            "select_all",
         )
         select_all.pack(side="left")
-        select_none = ttk.Button(
-            secondary, text="Снять выделение", command=lambda: self.tree.select_all(False)
+        select_none = self._translated(
+            ttk.Button(
+                secondary, command=lambda: self.tree.select_all(False)
+            ),
+            "select_none",
         )
         select_none.pack(side="left", padx=(8, 0))
-        self.settings_button = ttk.Button(
-            secondary, text="Настройки…", command=self._open_settings
+        self.settings_button = self._translated(
+            ttk.Button(secondary, command=self._open_settings), "settings"
         )
         self.settings_button.pack(side="right")
         self._busy_widgets.extend(
@@ -195,12 +221,16 @@ class App(tk.Tk):
 
         totals_bar = ttk.Frame(tree_frame)
         totals_bar.pack(fill="x", pady=(0, 6))
-        ttk.Label(totals_bar, text="Список модов").pack(side="left")
+        self._translated(ttk.Label(totals_bar), "mod_list").pack(side="left")
         ttk.Label(totals_bar, textvariable=self.totals).pack(side="right")
 
         tree_area = ttk.Frame(tree_frame)
         tree_area.pack(fill="both", expand=True)
-        self.tree = CheckTree(tree_area, on_change=self._update_totals)
+        self.tree = CheckTree(
+            tree_area,
+            on_change=self._update_totals,
+            language=self.language.get(),
+        )
         scrollbar = ttk.Scrollbar(tree_area, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.pack(side="left", fill="both", expand=True)
@@ -212,7 +242,9 @@ class App(tk.Tk):
         self.progress = ttk.Progressbar(bottom, length=260, mode="determinate")
         self.progress.pack(side="right")
 
-        log_frame = ttk.LabelFrame(self, text="Лог", padding=6)
+        log_frame = self._translated(
+            ttk.LabelFrame(self, padding=6), "log", option="text"
+        )
         log_frame.pack(fill="both", expand=False, padx=10, pady=(0, 10))
         self.log_text = tk.Text(log_frame, height=7, state="disabled", wrap="word")
         log_scroll = ttk.Scrollbar(log_frame, orient="vertical", command=self.log_text.yview)
@@ -230,7 +262,7 @@ class App(tk.Tk):
 
     def _choose_steamcmd(self) -> None:
         chosen = filedialog.askopenfilename(
-            title="Выберите исполняемый файл SteamCMD",
+            title=self.t("choose_steamcmd_title"),
             initialdir=str(Path.home()),
         )
         if chosen:
@@ -239,71 +271,90 @@ class App(tk.Tk):
     def _open_settings(self) -> None:
         if self._busy():
             return
+        t = self.t
         dialog = tk.Toplevel(self)
-        dialog.title("Настройки")
+        dialog.title(t("settings_title"))
         dialog.transient(self)
         dialog.resizable(False, False)
 
         body = ttk.Frame(dialog, padding=12)
         body.pack(fill="both", expand=True)
 
-        steam = ttk.LabelFrame(body, text="SteamCMD", padding=8)
-        steam.pack(fill="x")
+        interface = ttk.LabelFrame(body, text=t("interface"), padding=8)
+        interface.pack(fill="x")
+        language_row = ttk.Frame(interface)
+        language_row.pack(fill="x")
+        ttk.Label(language_row, text=t("language")).pack(side="left")
+        names = list(LANGUAGE_NAMES.values())
+        codes = {name: code for code, name in LANGUAGE_NAMES.items()}
+        current_name = LANGUAGE_NAMES.get(self.language.get(), names[0])
+        language_name = tk.StringVar(value=current_name)
+        combo = ttk.Combobox(
+            language_row,
+            textvariable=language_name,
+            values=names,
+            state="readonly",
+            width=16,
+        )
+        combo.pack(side="left", padx=(8, 0))
+
+        steam = ttk.LabelFrame(body, text=t("steamcmd"), padding=8)
+        steam.pack(fill="x", pady=(10, 0))
         steam_row = ttk.Frame(steam)
         steam_row.pack(fill="x")
-        ttk.Label(steam_row, text="Путь к SteamCMD:").pack(side="left")
+        ttk.Label(steam_row, text=t("steamcmd_path")).pack(side="left")
         steam_entry = ttk.Entry(steam_row, textvariable=self.steamcmd, width=46)
         steam_entry.pack(side="left", fill="x", expand=True, padx=(8, 0))
         ttk.Button(
-            steam_row, text="Указать файл…", command=self._choose_steamcmd
+            steam_row, text=t("choose_file"), command=self._choose_steamcmd
         ).pack(side="left", padx=(8, 0))
         ttk.Checkbutton(
             steam,
-            text="Скачивать SteamCMD автоматически, если он не найден",
+            text=t("bootstrap"),
             variable=self.bootstrap_steamcmd,
         ).pack(anchor="w", pady=(8, 0))
         ttk.Label(
             steam,
-            text="Если путь пуст, SteamCMD будет найден или скачан автоматически.",
+            text=t("bootstrap_hint"),
             foreground="#666666",
         ).pack(anchor="w")
 
-        auth = ttk.LabelFrame(body, text="Авторизация Steam", padding=8)
+        auth = ttk.LabelFrame(body, text=t("auth"), padding=8)
         auth.pack(fill="x", pady=(10, 0))
         auth_row = ttk.Frame(auth)
         auth_row.pack(fill="x")
         ttk.Radiobutton(
             auth_row,
-            text="Анонимно",
+            text=t("anonymous"),
             value="anonymous",
             variable=self.auth_mode,
         ).pack(side="left")
         ttk.Radiobutton(
             auth_row,
-            text="Аккаунт Steam",
+            text=t("account"),
             value="login",
             variable=self.auth_mode,
         ).pack(side="left", padx=(16, 0))
         user_row = ttk.Frame(auth)
         user_row.pack(fill="x", pady=(8, 0))
-        ttk.Label(user_row, text="Логин:").pack(side="left")
+        ttk.Label(user_row, text=t("username")).pack(side="left")
         ttk.Entry(user_row, textvariable=self.username, width=28).pack(
             side="left", padx=(8, 0)
         )
         ttk.Label(
             auth,
-            text="Пароль и код Steam Guard будут запрошены при загрузке.",
+            text=t("auth_hint"),
             foreground="#666666",
         ).pack(anchor="w", pady=(6, 0))
 
-        options = ttk.LabelFrame(body, text="Параметры загрузки", padding=8)
+        options = ttk.LabelFrame(body, text=t("options"), padding=8)
         options.pack(fill="x", pady=(10, 0))
-        for text, variable in (
-            ("Докачивать недокачанное (resume)", self.resume),
-            ("Проверять файлы после загрузки (validate)", self.validate),
-            ("Упаковывать каждый мод в ZIP", self.zip_items),
+        for key, variable in (
+            ("resume", self.resume),
+            ("validate", self.validate),
+            ("zip", self.zip_items),
         ):
-            ttk.Checkbutton(options, text=text, variable=variable).pack(anchor="w")
+            ttk.Checkbutton(options, text=t(key), variable=variable).pack(anchor="w")
 
         variables = (
             self.steamcmd,
@@ -321,10 +372,21 @@ class App(tk.Tk):
                 variable.set(value)
             dialog.destroy()
 
-        ttk.Button(body, text="Отмена", command=cancel).pack(
+        def save() -> None:
+            code = codes.get(language_name.get(), self.language.get())
+            if code != self.language.get():
+                self.language.set(code)
+                self._apply_language()
+                try:
+                    save_gui_preferences({"language": code})
+                except OSError:
+                    pass
+            dialog.destroy()
+
+        ttk.Button(body, text=t("cancel"), command=cancel).pack(
             side="right", pady=(12, 0)
         )
-        ttk.Button(body, text="Сохранить", command=dialog.destroy).pack(
+        ttk.Button(body, text=t("save"), command=save).pack(
             side="right", padx=(0, 8), pady=(12, 0)
         )
 
@@ -354,17 +416,19 @@ class App(tk.Tk):
             return
         target = self.target.get().strip()
         if not target:
-            messagebox.showwarning("Нет ссылки", "Вставьте ссылку или ID.")
+            messagebox.showwarning(
+                self.t("no_link_title"), self.t("no_link_text")
+            )
             return
         if self.auth_mode.get() == "login" and not self.username.get().strip():
             messagebox.showwarning(
-                "Нужен логин",
-                "Для входа под аккаунтом укажите логин Steam.",
+                self.t("login_required_title"),
+                self.t("login_required_text"),
             )
             return
 
         target_type = self.target_type.get()
-        self._set_busy(True, "Получение списка…")
+        self._set_busy(True, "status_loading_list")
         self.cancel.clear()
         self.progress.configure(mode="indeterminate")
         self.progress.start(12)
@@ -378,7 +442,7 @@ class App(tk.Tk):
             except WorkshopError as exc:
                 self.messages.put(("error", str(exc)))
             except Exception as exc:  # noqa: BLE001 - shown to the user
-                self.messages.put(("error", f"Неожиданная ошибка: {exc}"))
+                self.messages.put(("unexpected_error", str(exc)))
 
         self._start_worker(work)
 
@@ -387,7 +451,9 @@ class App(tk.Tk):
             return
         items = selected_items(self.root_node)
         if not items:
-            messagebox.showinfo("Пусто", "Не выбрано ни одного мода.")
+            messagebox.showinfo(
+                self.t("empty_title"), self.t("empty_text")
+            )
             return
         self._start_download(items)
 
@@ -400,7 +466,9 @@ class App(tk.Tk):
             if node.status in RETRYABLE and node.selectable
         ]
         if not failed:
-            messagebox.showinfo("Нечего повторять", "Ошибок и отменённых загрузок нет.")
+            messagebox.showinfo(
+                self.t("nothing_retry_title"), self.t("nothing_retry_text")
+            )
             return
         self._start_download(failed)
 
@@ -411,17 +479,18 @@ class App(tk.Tk):
         settings = self._settings()
         if settings.auth_mode == "login" and not settings.username:
             messagebox.showwarning(
-                "Нужен логин", "Для входа под аккаунтом укажите логин Steam."
+                self.t("login_required_title"),
+                self.t("login_required_text"),
             )
             return
         try:
             settings.output_dir.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
-            messagebox.showerror("Папка недоступна", str(exc))
+            messagebox.showerror(self.t("folder_unavailable"), str(exc))
             return
 
         self.cancel.clear()
-        self._set_busy(True, f"Загрузка: {len(items)} мод(ов)…")
+        self._set_busy(True, "status_downloading", count=len(items))
         self.progress.configure(mode="determinate", maximum=max(len(items), 1), value=0)
 
         def work() -> None:
@@ -437,7 +506,7 @@ class App(tk.Tk):
             except WorkshopError as exc:
                 self.messages.put(("error", str(exc)))
             except Exception as exc:  # noqa: BLE001
-                self.messages.put(("error", f"Неожиданная ошибка: {exc}"))
+                self.messages.put(("unexpected_error", str(exc)))
 
         self._start_worker(work)
 
@@ -447,15 +516,33 @@ class App(tk.Tk):
 
     def _cancel(self) -> None:
         self.cancel.set()
-        self._log("info", "Запрошена отмена…")
+        self._log("info", self.t("cancel_requested"))
         self.cancel_button.configure(state="disabled")
 
     # ------------------------------------------------------------------ state
     def _busy(self) -> bool:
         return bool(self.worker and self.worker.is_alive())
 
-    def _set_busy(self, busy: bool, text: str) -> None:
-        self.status.set(text)
+    def _set_status(self, key: str, **values: object) -> None:
+        self._status_key = key
+        self._status_values = values
+        self.status.set(self.t(key, **values))
+
+    def _refresh_status(self) -> None:
+        self.status.set(self.t(self._status_key, **self._status_values))
+
+    def _apply_language(self) -> None:
+        for widget, key, option in self._translatable:
+            try:
+                widget.configure(**{option: self.t(key)})
+            except tk.TclError:
+                pass
+        self.tree.set_language(self.language.get())
+        self._update_totals()
+        self._refresh_status()
+
+    def _set_busy(self, busy: bool, key: str, **values: object) -> None:
+        self._set_status(key, **values)
         state = "disabled" if busy else "normal"
         for widget in self._busy_widgets:
             try:
@@ -469,11 +556,18 @@ class App(tk.Tk):
 
     def _update_totals(self) -> None:
         if self.root_node is None:
-            self.totals.set("Список не загружен")
+            self.totals.set(self.t("list_not_loaded"))
             return
         available, selected = self.root_node.counts()
         size = self.root_node.total_size(selected_only=True)
-        self.totals.set(f"Выбрано {selected} из {available} · {human_size(size)}")
+        self.totals.set(
+            self.t(
+                "totals",
+                selected=selected,
+                available=available,
+                size=human_size(size, language=self.language.get()),
+            )
+        )
 
     def _clear_list(self) -> None:
         if self._busy():
@@ -481,8 +575,8 @@ class App(tk.Tk):
         self.root_node = None
         self.tree.clear()
         self.progress.configure(value=0)
-        self.totals.set("Список не загружен")
-        self.status.set("Выберите тип и нажмите «Загрузить список модов»")
+        self.totals.set(self.t("list_not_loaded"))
+        self._set_status("status_choose")
 
     # ------------------------------------------------------------------ event pump
     def _poll(self) -> None:
@@ -518,32 +612,38 @@ class App(tk.Tk):
             self.root_node = message[1]
             self.worker = None
             self._update_totals()
-            self._set_busy(False, "Список загружен")
+            self._set_busy(False, "status_list_loaded")
         elif kind == "prompt":
             self._handle_prompt(message[1])
         elif kind == "wrong_type":
             self._handle_wrong_type(message[1], message[2])
         elif kind == "finished":
             self._handle_finished(message[1])
+        elif kind == "unexpected_error":
+            text = self.t("unexpected_error", error=message[1])
+            self.worker = None
+            self._set_busy(False, "status_error")
+            self._log("error", text)
+            messagebox.showerror(self.t("error_title"), text)
         elif kind == "error":
             self.worker = None
-            self._set_busy(False, "Ошибка")
+            self._set_busy(False, "status_error")
             self._log("error", message[1])
-            messagebox.showerror("Ошибка", message[1])
+            messagebox.showerror(self.t("error_title"), message[1])
 
     def _handle_prompt(self, request: PromptRequest) -> None:
         try:
             if request.kind == "password":
                 request.value = simpledialog.askstring(
-                    "Вход в Steam",
-                    f"Пароль Steam для «{request.username}»:",
+                    self.t("prompt_title"),
+                    self.t("prompt_password", username=request.username),
                     show="*",
                     parent=self,
                 )
             else:
                 request.value = simpledialog.askstring(
-                    "Steam Guard",
-                    "Код Steam Guard:",
+                    self.t("guard_title"),
+                    self.t("guard_code"),
                     parent=self,
                 )
         finally:
@@ -551,18 +651,33 @@ class App(tk.Tk):
 
     def _handle_wrong_type(self, message: str, actual_type: str) -> None:
         self.worker = None
-        self._set_busy(False, "Другой тип цели")
-        label = "коллекция" if actual_type == "collection" else "мод"
+        self._set_busy(False, "status_wrong_type")
+        label = self.t(
+            "label_collection" if actual_type == "collection" else "label_mod"
+        )
         if messagebox.askyesno(
-            "Похоже, выбран другой тип",
-            f"{message}\n\nЭто {label}. Переключить режим и повторить?",
+            self.t("wrong_title"),
+            self.t("wrong_text", label=label),
         ):
             self.target_type.set(actual_type)
             self._show_list()
 
+    def _summary_text(self, summary: Summary) -> str:
+        parts = [
+            self.t("summary_done", count=summary.done),
+            self.t("summary_skipped", count=summary.skipped),
+            self.t("summary_failed", count=summary.failed),
+            self.t("summary_unavailable", count=summary.unavailable),
+        ]
+        if summary.canceled:
+            parts.append(self.t("summary_canceled", count=summary.canceled))
+        return ", ".join(parts)
+
     def _handle_finished(self, summary: Summary) -> None:
         self.worker = None
-        self._set_busy(False, "Готово" if summary.ok else "Завершено с ошибками")
+        self._set_busy(
+            False, "status_done" if summary.ok else "status_finished_errors"
+        )
         self.tree.refresh()
         self._update_totals()
         if (
@@ -573,8 +688,12 @@ class App(tk.Tk):
             or summary.unavailable
         ):
             messagebox.showinfo(
-                "Загрузка завершена",
-                f"{summary.as_text()}\nВремя: {summary.elapsed:.1f} с",
+                self.t("finished_title"),
+                self.t(
+                    "finished_text",
+                    summary=self._summary_text(summary),
+                    elapsed=f"{summary.elapsed:.1f}",
+                ),
             )
 
     def _log(self, level: str, message: str) -> None:

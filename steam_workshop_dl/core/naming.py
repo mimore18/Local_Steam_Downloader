@@ -24,16 +24,22 @@ WINDOWS_RESERVED = {
 
 MAX_FOLDER_NAME = 120
 
+SIZE_UNITS = {
+    "ru": ("Б", "КБ", "МБ", "ГБ", "ТБ"),
+    "en": ("B", "KB", "MB", "GB", "TB"),
+}
 
-def human_size(size: int | None) -> str:
+
+def human_size(size: int | None, *, language: str = "ru") -> str:
+    units = SIZE_UNITS.get(str(language).lower()[:2], SIZE_UNITS["ru"])
     if size is None:
         return "—"
     value = float(size)
-    for unit in ("Б", "КБ", "МБ", "ГБ", "ТБ"):
-        if value < 1024 or unit == "ТБ":
-            return f"{value:.1f} {unit}" if unit != "Б" else f"{int(value)} {unit}"
+    for index, unit in enumerate(units):
+        if value < 1024 or index == len(units) - 1:
+            return f"{value:.1f} {unit}" if index > 0 else f"{int(value)} {unit}"
         value /= 1024
-    return f"{value:.1f} ТБ"
+    return f"{value:.1f} {units[-1]}"
 
 
 def sanitize_title(title: str, item_id: str) -> str:
