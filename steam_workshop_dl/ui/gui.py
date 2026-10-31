@@ -10,6 +10,7 @@ from __future__ import annotations
 import queue
 import threading
 import tkinter as tk
+import webbrowser
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
@@ -25,6 +26,7 @@ from .gui_tree import CheckTree
 from .i18n import LANGUAGE_NAMES, normalize_language, system_language, translate
 
 RETRYABLE = {ItemStatus.FAILED, ItemStatus.CANCELED}
+PROJECT_URL = "https://github.com/mimore18/Local_Steam_Downloader"
 
 
 class PromptRequest:
@@ -251,6 +253,17 @@ class App(tk.Tk):
         self.log_text.configure(yscrollcommand=log_scroll.set)
         self.log_text.pack(side="left", fill="both", expand=True)
         log_scroll.pack(side="right", fill="y")
+
+        footer = ttk.Frame(self, padding=(10, 0, 10, 8))
+        footer.pack(fill="x")
+        self.github_link = ttk.Label(
+            footer,
+            text="GitHub: github.com/mimore18/Local_Steam_Downloader",
+            foreground="#0b5cad",
+            cursor="hand2",
+        )
+        self.github_link.pack(side="left")
+        self.github_link.bind("<Button-1>", lambda _event: self._open_github())
 
     # ------------------------------------------------------------------ input
     def _choose_output(self) -> None:
@@ -705,6 +718,9 @@ class App(tk.Tk):
     def _on_close(self) -> None:
         self.cancel.set()
         self.destroy()
+
+    def _open_github(self) -> None:
+        webbrowser.open(PROJECT_URL)
 
 
 def run_gui() -> int:
