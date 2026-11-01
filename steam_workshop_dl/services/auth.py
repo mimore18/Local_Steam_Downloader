@@ -20,7 +20,13 @@ from ..core.errors import LoginFailedError
 from ..core.events import Events, NullEvents
 from ..core.models import Settings
 from .logging_setup import mask_secrets
-from .steamcmd import LOGIN_FAILED_RE, LOGIN_OK_RE, find_steamcmd, popen_kwargs
+from .steamcmd import (
+    LOGIN_FAILED_RE,
+    LOGIN_OK_RE,
+    decode_steamcmd,
+    find_steamcmd,
+    popen_kwargs,
+)
 
 PASSWORD_RE = re.compile(r"password\s*:", re.IGNORECASE)
 GUARD_RE = re.compile(r"(steam guard code|two-factor code|two factor code)\s*:", re.IGNORECASE)
@@ -66,7 +72,7 @@ def ensure_login(
 
 
 def _decode(raw: bytes) -> str:
-    return raw.decode("utf-8", errors="replace")
+    return decode_steamcmd(raw)
 
 
 def _anonymous_login(executable: Path, events: Events, timeout: float) -> None:

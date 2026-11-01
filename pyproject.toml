@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "steam-workshop-dl"
-version = "0.2.0"
+version = "0.2.1"
 description = "Cross-platform Steam Workshop collection downloader"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -30,6 +30,9 @@ dev = ["pytest>=8"]
 
 [tool.setuptools.packages.find]
 include = ["steam_workshop_dl*"]
+
+[tool.setuptools.package-data]
+steam_workshop_dl = ["assets/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

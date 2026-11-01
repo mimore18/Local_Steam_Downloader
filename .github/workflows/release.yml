@@ -24,11 +24,14 @@ jobs:
       - name: Build CLI executable
         run: >-
           pyinstaller --noconfirm --clean --onefile
+          --icon steam_workshop_dl/assets/icon.ico
           --name steam-workshop-dl --paths . run_cli.py
 
       - name: Build GUI executable
         run: >-
           pyinstaller --noconfirm --clean --onefile --windowed
+          --icon steam_workshop_dl/assets/icon.ico
+          --add-data "steam_workshop_dl/assets;steam_workshop_dl/assets"
           --name steam-workshop-dl-gui --paths . run_gui.py
 
       - name: Create Windows archive

@@ -8,6 +8,7 @@ core objects as the CLI and contains no download policy of its own.
 from __future__ import annotations
 
 import queue
+import sys
 import threading
 import tkinter as tk
 import webbrowser
@@ -20,6 +21,7 @@ from ..core.errors import WorkshopError, WrongTargetTypeError
 from ..core.models import ItemStatus, Settings, Summary, WorkshopNode
 from ..core.naming import human_size
 from ..core.tree import selected_items
+from ..resources import asset_path
 from ..services.config import load_gui_preferences, save_gui_preferences
 from ..services.steam_api import SteamAPI
 from .gui_tree import CheckTree
@@ -85,6 +87,9 @@ class GuiEvents:
     def item_status(self, item_id: str, status: ItemStatus, detail: str = "") -> None:
         self.messages.put(("status", item_id, status, detail))
 
+    def item_progress(self, item_id: str, percent: float) -> None:
+        self.messages.put(("item_progress", item_id, percent))
+
     def progress(self, done: int, total: int, current_id: str | None) -> None:
         self.messages.put(("progress", done, total))
 
@@ -98,6 +103,7 @@ class App(tk.Tk):
         self.title("Steam Workshop Downloader")
         self.geometry("1040x760")
         self.minsize(820, 580)
+        self._set_window_icon()
 
         self.messages: queue.Queue = queue.Queue()
         self.events = GuiEvents(self.messages)
@@ -110,6 +116,9 @@ class App(tk.Tk):
         self._log_entries: list[tuple[str, str]] = []
         self._status_key = "ready"
         self._status_values: dict[str, object] = {}
+        self._download_total = 0
+        self._download_done = 0
+        self._item_progress: dict[str, float] = {}
 
         preferences = load_gui_preferences()
         saved_language = normalize_language(preferences.get("language"))
@@ -144,6 +153,24 @@ class App(tk.Tk):
         widget.configure(**{option: self.t(key)})
         self._translatable.append((widget, key, option))
         return widget
+
+    def _set_window_icon(self) -> None:
+        try:
+            icon = tk.PhotoImage(file=str(asset_path("icon.png")))
+        except (OSError, tk.TclError):
+            return
+        self._window_icon = icon
+        try:
+            self.iconphoto(True, icon)
+        except tk.TclError:
+            pass
+        if sys.platform.startswith("win"):
+            ico = asset_path("icon.ico")
+            if ico.is_file():
+                try:
+                    self.iconbitmap(default=str(ico))
+                except tk.TclError:
+                    pass
 
     def _build(self) -> None:
         top = ttk.Frame(self, padding=10)
@@ -556,8 +583,13 @@ class App(tk.Tk):
             return
 
         self.cancel.clear()
+        self._download_total = len(items)
+        self._download_done = 0
+        self._item_progress.clear()
         self._set_busy(True, "status_downloading", count=len(items))
-        self.progress.configure(mode="determinate", maximum=max(len(items), 1), value=0)
+        self.progress.configure(
+            mode="determinate", maximum=max(len(items), 1) * 100, value=0
+        )
 
         def work() -> None:
             try:
@@ -630,6 +662,22 @@ class App(tk.Tk):
             self.progress.stop()
             self.progress.configure(mode="determinate")
 
+    def _overall_percent(self) -> float:
+        total = max(self._download_total, 1)
+        completed = min(self._download_done, self._download_total)
+        current = sum(
+            min(max(percent, 0.0), 100.0) for percent in self._item_progress.values()
+        )
+        return min(100.0, (completed + current / 100.0) / total * 100.0)
+
+    def _refresh_progress_bar(self) -> None:
+        total = max(self._download_total, 1)
+        self.progress.configure(
+            mode="determinate",
+            maximum=total * 100,
+            value=self._overall_percent() / 100.0 * total * 100.0,
+        )
+
     def _update_totals(self) -> None:
         if self.root_node is None:
             self.totals.set(self.t("list_not_loaded"))
@@ -681,9 +729,24 @@ class App(tk.Tk):
             self._update_totals()
         elif kind == "status":
             self.tree.update_status(message[1], message[2])
+            if message[2] in {
+                ItemStatus.DONE,
+                ItemStatus.FAILED,
+                ItemStatus.SKIPPED,
+                ItemStatus.CANCELED,
+            }:
+                self._item_progress.pop(message[1], None)
+                self._refresh_progress_bar()
+        elif kind == "item_progress":
+            self._item_progress[message[1]] = float(message[2])
+            self._refresh_progress_bar()
+            percent = self._overall_percent()
+            self._set_status("status_downloading_percent", percent=f"{percent:.0f}")
         elif kind == "progress":
             done, total = message[1], message[2]
-            self.progress.configure(maximum=max(total, 1), value=done)
+            self._download_done = done
+            self._download_total = total
+            self._refresh_progress_bar()
         elif kind == "preview_done":
             self.root_node = message[1]
             self.worker = None
@@ -756,6 +819,11 @@ class App(tk.Tk):
         self.worker = None
         self._set_busy(
             False, "status_done" if summary.ok else "status_finished_errors"
+        )
+        self.progress.configure(
+            mode="determinate",
+            maximum=max(self._download_total, 1) * 100,
+            value=max(self._download_total, 1) * 100,
         )
         self.tree.refresh()
         self._update_totals()

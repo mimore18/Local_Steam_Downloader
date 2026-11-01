@@ -58,6 +58,9 @@ class ConsoleEvents:
             if status is not ItemStatus.DONE:
                 log.info("%s: %s%s", item_id, status.value, tail)
 
+    def item_progress(self, item_id: str, percent: float) -> None:
+        log.debug("%s: %s%%", item_id, f"{percent:.1f}")
+
     def progress(self, done: int, total: int, current_id: str | None) -> None:
         log.info("Прогресс: %s/%s", done, total)
 

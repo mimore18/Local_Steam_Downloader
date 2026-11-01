@@ -3,6 +3,7 @@ from pathlib import Path
 from steam_workshop_dl.core.models import NodeKind, WorkshopNode
 from steam_workshop_dl.services.steamcmd import (
     build_command,
+    decode_steamcmd,
     parse_line,
     write_runscript,
 )
@@ -24,7 +25,42 @@ def test_parse_failure_line() -> None:
 
 
 def test_parse_irrelevant_line() -> None:
-    assert parse_line("Update state (0x61) downloading, progress: 50.00") is None
+    assert parse_line("Connecting anonymously to Steam Public...") is None
+
+
+def test_parse_start_line() -> None:
+    parsed = parse_line("Downloading item 333 ...")
+    assert parsed is not None
+    assert parsed.kind == "start"
+    assert parsed.item_id == "333"
+
+
+def test_parse_progress_line() -> None:
+    parsed = parse_line("Update state (0x61) downloading, progress: 42.50")
+    assert parsed is not None
+    assert parsed.kind == "progress"
+    assert parsed.percent == 42.5
+
+
+def test_parse_bracket_percent_line() -> None:
+    parsed = parse_line("[ 73%] downloading")
+    assert parsed is not None
+    assert parsed.kind == "progress"
+    assert parsed.percent == 73.0
+
+
+def test_decode_utf8() -> None:
+    assert decode_steamcmd("Загрузка завершена".encode()) == "Загрузка завершена"
+
+
+def test_decode_cp1251() -> None:
+    raw = "Загрузка завершена".encode("cp1251")
+    assert decode_steamcmd(raw) == "Загрузка завершена"
+
+
+def test_decode_mojibake() -> None:
+    mojibake = "Загрузка завершена".encode().decode("cp1251")
+    assert decode_steamcmd(mojibake.encode()) == "Загрузка завершена"
 
 
 def test_write_runscript(tmp_path: Path) -> None:

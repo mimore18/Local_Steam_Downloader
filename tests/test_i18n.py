@@ -235,6 +235,31 @@ def test_footer_is_packed_before_the_expanding_split(app) -> None:
     assert isinstance(instance.split, tk.ttk.Panedwindow)
 
 
+def test_window_icon_is_loaded(app) -> None:
+    instance, _ = app
+    assert instance._window_icon.width() == 512
+
+
+def test_gui_progress_tracks_item_percent(app) -> None:
+    from steam_workshop_dl.core.models import ItemStatus
+
+    instance, _ = app
+    instance._download_total = 2
+    instance._download_done = 0
+    instance._item_progress.clear()
+
+    instance._dispatch(("item_progress", "1", 40.0))
+    assert float(instance.progress.cget("value")) == 40.0
+    assert instance.status.get() == "Скачивание: 20%"
+
+    instance._dispatch(("status", "1", ItemStatus.DONE))
+    instance._dispatch(("progress", 1, 2))
+    instance._dispatch(("item_progress", "2", 50.0))
+
+    assert float(instance.progress.cget("value")) == 150.0
+    assert instance.status.get() == "Скачивание: 75%"
+
+
 def test_gui_remembers_saved_theme(app) -> None:
     import json
 

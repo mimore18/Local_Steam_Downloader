@@ -3,6 +3,7 @@ from pathlib import Path
 
 from steam_workshop_dl.app import downloader as downloader_module
 from steam_workshop_dl.app.downloader import Downloader
+from steam_workshop_dl.core.events import NullEvents
 from steam_workshop_dl.core.models import ItemStatus, NodeKind, Settings, WorkshopNode
 
 
@@ -76,3 +77,57 @@ def test_run_respects_explicit_items(monkeypatch, tmp_path: Path) -> None:
     assert summary.done == 1
     assert second.status is ItemStatus.DONE
     assert first.status is ItemStatus.PENDING
+
+
+class Recorder(NullEvents):
+    def __init__(self) -> None:
+        self.statuses: list[tuple[str, ItemStatus]] = []
+        self.progress: list[tuple[str, float]] = []
+
+    def item_status(self, item_id: str, status: ItemStatus, detail: str = "") -> None:
+        self.statuses.append((item_id, status))
+
+    def item_progress(self, item_id: str, percent: float) -> None:
+        self.progress.append((item_id, percent))
+
+
+def test_handle_line_marks_only_current_item() -> None:
+    first = make_node("111", "First")
+    second = make_node("222", "Second")
+    found: dict[str, Path | None] = {"111": None, "222": None}
+    state: dict[str, object] = {"current": None, "percent": {}}
+    events = Recorder()
+
+    Downloader._handle_line(
+        "Downloading item 111 ...", found, {"111": first, "222": second}, state, events
+    )
+    Downloader._handle_line(
+        "Update state (0x61) downloading, progress: 42.50",
+        found,
+        {"111": first, "222": second},
+        state,
+        events,
+    )
+
+    assert first.status is ItemStatus.DOWNLOADING
+    assert second.status is ItemStatus.PENDING
+    assert events.statuses == [("111", ItemStatus.DOWNLOADING)]
+    assert events.progress == [("111", 0.0), ("111", 42.5)]
+
+
+def test_handle_line_ignores_progress_between_items() -> None:
+    node = make_node("111", "First")
+    found: dict[str, Path | None] = {"111": None}
+    state: dict[str, object] = {"current": None, "percent": {}}
+    events = Recorder()
+
+    Downloader._handle_line(
+        "Update state (0x61) downloading, progress: 42.50",
+        found,
+        {"111": node},
+        state,
+        events,
+    )
+
+    assert events.progress == []
+    assert node.status is ItemStatus.PENDING

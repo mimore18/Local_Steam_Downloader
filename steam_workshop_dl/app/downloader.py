@@ -121,10 +121,6 @@ class Downloader:
                 if cancel.wait(2**attempt):
                     break
 
-            for node in pending:
-                node.status = ItemStatus.DOWNLOADING
-                events.item_status(node.id, ItemStatus.DOWNLOADING)
-
             failed = self._download_pass(
                 steamcmd, pending, settings, events, cancel
             )
@@ -176,6 +172,8 @@ class Downloader:
         """Run one SteamCMD batch and return item_id -> source path."""
 
         found: dict[str, Path | None] = {node.id: None for node in items}
+        by_id = {node.id: node for node in items}
+        state: dict[str, object] = {"current": None, "percent": {}}
         with tempfile.TemporaryDirectory(prefix="swdl-") as tmp:
             script = Path(tmp) / "download.txt"
             write_runscript(
@@ -189,7 +187,9 @@ class Downloader:
                 run_script(
                     steamcmd,
                     script,
-                    on_line=lambda line: self._handle_line(line, found, events),
+                    on_line=lambda line: self._handle_line(
+                        line, found, by_id, state, events
+                    ),
                     cancel=cancel.is_set,
                 )
             except OSError as exc:
@@ -213,16 +213,35 @@ class Downloader:
     def _handle_line(
         line: str,
         found: dict[str, Path | None],
+        by_id: dict[str, WorkshopNode],
+        state: dict[str, object],
         events: Events,
     ) -> None:
         events.log("debug", line)
         parsed = parse_line(line)
         if parsed is None:
             return
-        if parsed.kind == "success" and parsed.item_id in found:
+        if parsed.kind == "start" and parsed.item_id in found:
+            state["current"] = parsed.item_id
+            node = by_id.get(parsed.item_id)
+            if node is not None:
+                node.status = ItemStatus.DOWNLOADING
+            events.item_status(parsed.item_id, ItemStatus.DOWNLOADING)
+            events.item_progress(parsed.item_id, 0.0)
+        elif parsed.kind == "progress":
+            current = state.get("current")
+            if current in found and parsed.percent is not None:
+                percents = state["percent"]
+                assert isinstance(percents, dict)
+                percents[current] = parsed.percent
+                events.item_progress(current, parsed.percent)
+        elif parsed.kind == "success" and parsed.item_id in found:
             found[parsed.item_id] = parsed.path
+            state["current"] = None
+            events.item_progress(parsed.item_id, 100.0)
         elif parsed.kind == "failure" and parsed.item_id in found:
             found[parsed.item_id] = None
+            state["current"] = None
 
     def _install(self, node: WorkshopNode, source: Path, settings: Settings) -> Path:
         """Copy or zip one item.  Returns the path relative to output_dir."""

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import locale
 import os
 import re
 import shutil
@@ -17,6 +18,9 @@ from ..core.models import WorkshopNode
 
 SUCCESS_RE = re.compile(r'Success\. Downloaded item (\d+) to "(.+)"')
 FAILED_RE = re.compile(r"ERROR! Download item (\d+) failed")
+START_RE = re.compile(r"(?i)Downloading (?:workshop )?item\s+(\d+)")
+PROGRESS_RE = re.compile(r"(?i)progress:\s*(\d+(?:[.,]\d+)?)")
+PERCENT_RE = re.compile(r"\[\s*(\d{1,3}(?:[.,]\d+)?)%\]")
 LOGIN_FAILED_RE = re.compile(r"(?i)(FAILED login|Invalid Password|Rate Limit Exceeded)")
 LOGIN_OK_RE = re.compile(r"(?i)(Logged in OK|Log On successful|Waiting for user info\.\.\.OK)")
 
@@ -25,9 +29,10 @@ ENV_STEAMCMD = "STEAMCMD_PATH"
 
 @dataclass(frozen=True)
 class SteamCmdLine:
-    kind: Literal["success", "failure", "info"]
+    kind: Literal["success", "failure", "start", "progress", "info"]
     item_id: str | None = None
     path: Path | None = None
+    percent: float | None = None
 
 
 def find_steamcmd(explicit: str | Path | None = None) -> Path:
@@ -102,7 +107,76 @@ def parse_line(line: str) -> SteamCmdLine | None:
     failed = FAILED_RE.search(line)
     if failed:
         return SteamCmdLine("failure", failed.group(1))
+    started = START_RE.search(line)
+    if started:
+        return SteamCmdLine("start", started.group(1))
+    progress = PROGRESS_RE.search(line) or PERCENT_RE.search(line)
+    if progress:
+        try:
+            percent = float(progress.group(1).replace(",", "."))
+        except ValueError:
+            return None
+        return SteamCmdLine("progress", percent=max(0.0, min(percent, 100.0)))
     return None
+
+
+_MOJIBAKE_MARKERS = ("Р°", "Рµ", "Рё", "Рѕ", "С‚", "СЂ", "СЃ", "РЅ", "Рє")
+
+
+def _candidate_encodings() -> tuple[str, ...]:
+    """Encodings SteamCMD may use when stdout is redirected."""
+
+    encodings: list[str] = ["utf-8"]
+    if sys.platform.startswith("win"):
+        try:
+            import ctypes
+
+            oem = ctypes.windll.kernel32.GetOEMCP()
+            if oem:
+                encodings.append(f"cp{oem}")
+        except (AttributeError, OSError, ValueError):
+            pass
+        encodings.extend(["cp866", "cp1251", "cp437", "cp1252"])
+    else:
+        encodings.append(locale.getpreferredencoding(False) or "utf-8")
+        encodings.extend(["cp1251", "cp866"])
+    encodings.append("latin-1")
+
+    unique: list[str] = []
+    seen: set[str] = set()
+    for encoding in encodings:
+        key = encoding.lower()
+        if key not in seen:
+            seen.add(key)
+            unique.append(encoding)
+    return tuple(unique)
+
+
+def _repair_mojibake(text: str) -> str:
+    """Undo UTF-8 text that was previously decoded as a single-byte codepage."""
+
+    if not any(marker in text for marker in _MOJIBAKE_MARKERS):
+        return text
+    for encoding in ("cp1251", "cp866"):
+        try:
+            repaired = text.encode(encoding).decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            continue
+        if repaired != text and any("\u0400" <= char <= "\u04ff" for char in repaired):
+            return repaired
+    return text
+
+
+def decode_steamcmd(raw: bytes) -> str:
+    """Decode a SteamCMD output line across Windows/Linux console codepages."""
+
+    for encoding in _candidate_encodings():
+        try:
+            text = raw.decode(encoding)
+        except (UnicodeDecodeError, LookupError):
+            continue
+        return _repair_mojibake(text).lstrip("\ufeff")
+    return raw.decode("utf-8", errors="replace").lstrip("\ufeff")
 
 
 def content_path(executable: Path, appid: int, item_id: str) -> Path:
@@ -151,8 +225,10 @@ def run_script(
     assert process.stdout is not None
     try:
         for raw in process.stdout:
-            text = raw.decode("utf-8", errors="replace").rstrip()
-            on_line(text)
+            for text in decode_steamcmd(raw).split("\r"):
+                text = text.strip()
+                if text:
+                    on_line(text)
             if cancel and cancel():
                 terminate_process(process)
                 break

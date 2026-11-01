@@ -24,6 +24,8 @@ class Events(Protocol):
 
     def item_status(self, item_id: str, status: ItemStatus, detail: str = "") -> None: ...
 
+    def item_progress(self, item_id: str, percent: float) -> None: ...
+
     def progress(self, done: int, total: int, current_id: str | None) -> None: ...
 
     def finished(self, summary: Summary) -> None: ...
@@ -45,6 +47,9 @@ class NullEvents:
         pass
 
     def item_status(self, item_id: str, status: ItemStatus, detail: str = "") -> None:
+        pass
+
+    def item_progress(self, item_id: str, percent: float) -> None:
         pass
 
     def progress(self, done: int, total: int, current_id: str | None) -> None:
