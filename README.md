@@ -213,11 +213,13 @@ In the GUI open **“Settings…” → “Interface” → “Theme”**.
 In the GUI open **“Settings…” → “Download options”**.
 
 - **Download threads**: `1` runs one sequential SteamCMD batch; `2–4` start
-  several SteamCMD processes in parallel.
+  several SteamCMD processes in parallel. Each thread logs in once and then
+  downloads its balanced share of the selected mods sequentially.
 - **Unstable mode** adds **One per mod** to the selector and starts a separate
-  SteamCMD process for every selected mod.
+  SteamCMD process for every selected mod. This has the highest startup and
+  login overhead and is usually slower than 1–4 threads.
 - Parallel mode may hit Steam rate limits or overload the computer. Start with
-  2 threads if you are unsure.
+  2 threads if you are unsure; use 1 if parallelism makes downloads slower.
 
 ### SteamCMD
 
@@ -447,11 +449,14 @@ python run_cli.py 123456789 --login МОЙ_ЛОГИН
 В GUI откройте **«Настройки…» → «Параметры загрузки»**.
 
 - **Потоков загрузки**: `1` — один последовательный запуск SteamCMD;
-  `2–4` — несколько процессов SteamCMD одновременно.
+  `2–4` — несколько процессов SteamCMD одновременно. Каждый поток один раз
+  входит в Steam, а затем последовательно скачивает свою часть модов.
 - **Нестабильный режим** добавляет в список вариант **«Каждый мод отдельно»**
-  и запускает отдельный SteamCMD для каждого выбранного мода.
+  и запускает отдельный SteamCMD для каждого выбранного мода. У этого режима
+  самые большие накладные расходы, и обычно он медленнее 1–4 потоков.
 - Параллельный режим может упереться в ограничения Steam или перегрузить
-  компьютер. Если не уверены, начните с 2 потоков.
+  компьютер. Если не уверены, начните с 2 потоков; если параллельность
+  замедляет загрузку, используйте 1.
 
 ### SteamCMD
 

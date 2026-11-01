@@ -21,6 +21,7 @@ FAILED_RE = re.compile(r"ERROR! Download item (\d+) failed")
 START_RE = re.compile(r"(?i)Downloading (?:workshop )?item\s+(\d+)")
 PROGRESS_RE = re.compile(r"(?i)progress:\s*(\d+(?:[.,]\d+)?)")
 PERCENT_RE = re.compile(r"\[\s*(\d{1,3}(?:[.,]\d+)?)%\]")
+ANSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 LOGIN_FAILED_RE = re.compile(r"(?i)(FAILED login|Invalid Password|Rate Limit Exceeded)")
 LOGIN_OK_RE = re.compile(r"(?i)(Logged in OK|Log On successful|Waiting for user info\.\.\.OK)")
 
@@ -175,8 +176,9 @@ def decode_steamcmd(raw: bytes) -> str:
             text = raw.decode(encoding)
         except (UnicodeDecodeError, LookupError):
             continue
-        return _repair_mojibake(text).lstrip("\ufeff")
-    return raw.decode("utf-8", errors="replace").lstrip("\ufeff")
+        return ANSI_RE.sub("", _repair_mojibake(text).lstrip("\ufeff"))
+    text = raw.decode("utf-8", errors="replace").lstrip("\ufeff")
+    return ANSI_RE.sub("", text)
 
 
 def content_path(executable: Path, appid: int, item_id: str) -> Path:

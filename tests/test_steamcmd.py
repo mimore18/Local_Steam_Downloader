@@ -63,6 +63,10 @@ def test_decode_mojibake() -> None:
     assert decode_steamcmd(mojibake.encode()) == "Загрузка завершена"
 
 
+def test_decode_strips_ansi() -> None:
+    assert decode_steamcmd(b"\x1b[0m\x1b[1mOK\x1b[0m") == "OK"
+
+
 def test_write_runscript(tmp_path: Path) -> None:
     script = tmp_path / "download.txt"
     items = [

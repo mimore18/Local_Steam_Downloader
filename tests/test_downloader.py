@@ -151,11 +151,11 @@ def test_download_parallel_runs_workers_concurrently(monkeypatch) -> None:
     nodes = [make_node("111", "First"), make_node("222", "Second")]
     barrier = Barrier(2)
 
-    def fake_single(self, steamcmd, node, settings, events, cancel):
+    def fake_batch(self, steamcmd, chunk, settings, events, cancel):
         barrier.wait(timeout=5)
-        return None
+        return {node.id: None for node in chunk}
 
-    monkeypatch.setattr(Downloader, "_download_single", fake_single)
+    monkeypatch.setattr(Downloader, "_download_batch", fake_batch)
     found = Downloader()._download_parallel(
         Path("/bin/true"),
         nodes,
@@ -166,3 +166,26 @@ def test_download_parallel_runs_workers_concurrently(monkeypatch) -> None:
     )
 
     assert found == {"111": None, "222": None}
+
+
+def test_split_balanced_keeps_all_items() -> None:
+    nodes = [
+        make_node("1", "A"),
+        make_node("2", "B"),
+        make_node("3", "C"),
+        make_node("4", "D"),
+    ]
+    nodes[0].size = 100
+    nodes[1].size = 80
+    nodes[2].size = 20
+    nodes[3].size = 10
+
+    chunks = Downloader._split_balanced(nodes, 2)
+
+    assert len(chunks) == 2
+    assert sorted(node.id for chunk in chunks for node in chunk) == [
+        "1",
+        "2",
+        "3",
+        "4",
+    ]

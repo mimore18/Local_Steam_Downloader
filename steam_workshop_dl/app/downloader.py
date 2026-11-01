@@ -238,52 +238,40 @@ class Downloader:
         cancel: threading.Event,
         workers: int,
     ) -> dict[str, Path | None]:
-        def run_one(node: WorkshopNode) -> tuple[str, Path | None]:
+        chunks = self._split_balanced(items, workers)
+        events.log(
+            "debug",
+            "Chunks: " + ", ".join(str(len(chunk)) for chunk in chunks),
+        )
+
+        def run_chunk(chunk: list[WorkshopNode]) -> dict[str, Path | None]:
             if cancel.is_set():
-                return node.id, None
-            return node.id, self._download_single(
-                steamcmd, node, settings, events, cancel
+                return {node.id: None for node in chunk}
+            return self._download_batch(
+                steamcmd, chunk, settings, events, cancel
             )
 
         found: dict[str, Path | None] = {node.id: None for node in items}
         with ThreadPoolExecutor(
-            max_workers=workers, thread_name_prefix="swdl"
+            max_workers=len(chunks), thread_name_prefix="swdl"
         ) as pool:
-            for item_id, path in pool.map(run_one, items):
-                found[item_id] = path
+            for part in pool.map(run_chunk, chunks):
+                found.update(part)
         return found
 
-    def _download_single(
-        self,
-        steamcmd: Path,
-        node: WorkshopNode,
-        settings: Settings,
-        events: Events,
-        cancel: threading.Event,
-    ) -> Path | None:
-        found: dict[str, Path | None] = {node.id: None}
-        state: dict[str, object] = {"current": node.id, "percent": {}}
-        with tempfile.TemporaryDirectory(prefix="swdl-") as tmp:
-            script = Path(tmp) / "download.txt"
-            write_runscript(
-                script,
-                [node],
-                auth_mode=settings.auth_mode,
-                username=settings.username,
-                validate=settings.validate,
-            )
-            try:
-                run_script(
-                    steamcmd,
-                    script,
-                    on_line=lambda line: self._handle_line(
-                        line, found, {node.id: node}, state, events
-                    ),
-                    cancel=cancel.is_set,
-                )
-            except OSError as exc:
-                events.log("error", f"SteamCMD не запустился: {exc}")
-        return found[node.id]
+    @staticmethod
+    def _split_balanced(
+        items: list[WorkshopNode], workers: int
+    ) -> list[list[WorkshopNode]]:
+        """Split items into balanced chunks, largest first, for worker reuse."""
+
+        buckets: list[list[WorkshopNode]] = [[] for _ in range(workers)]
+        loads = [0] * workers
+        for node in sorted(items, key=lambda item: item.size or 0, reverse=True):
+            index = min(range(workers), key=loads.__getitem__)
+            buckets[index].append(node)
+            loads[index] += node.size or 0
+        return [bucket for bucket in buckets if bucket]
 
     @staticmethod
     def _apply_fallbacks(

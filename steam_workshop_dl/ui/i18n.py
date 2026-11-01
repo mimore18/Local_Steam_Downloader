@@ -99,12 +99,15 @@ MESSAGES: dict[str, dict[str, str]] = {
         "auth_hint": "The password and Steam Guard code will be requested during download.",
         "options": "Download options",
         "threads": "Download threads:",
-        "threads_hint": "1 — one SteamCMD at a time; 2–4 — parallel downloads.",
+        "threads_hint": (
+            "1 — one SteamCMD batch; 2–4 — parallel, "
+            "one SteamCMD process per thread."
+        ),
         "threads_each_mod": "One per mod",
         "unstable": "Unstable mode",
         "unstable_hint": (
             "Adds “one SteamCMD per mod” to the thread selector. "
-            "May overload Steam or the PC."
+            "Usually slower and may overload Steam or the PC."
         ),
         "resume": "Resume incomplete downloads",
         "validate": "Validate files after download",
@@ -199,12 +202,15 @@ MESSAGES: dict[str, dict[str, str]] = {
         "auth_hint": "Пароль и код Steam Guard будут запрошены при загрузке.",
         "options": "Параметры загрузки",
         "threads": "Потоков загрузки:",
-        "threads_hint": "1 — один SteamCMD за раз; 2–4 — параллельные загрузки.",
+        "threads_hint": (
+            "1 — один запуск SteamCMD; 2–4 — параллельно, "
+            "по одному процессу SteamCMD на поток."
+        ),
         "threads_each_mod": "Каждый мод отдельно",
         "unstable": "Нестабильный режим",
         "unstable_hint": (
             "Добавляет в выбор потоков режим «каждый мод в своём SteamCMD». "
-            "Может перегрузить Steam или компьютер."
+            "Обычно медленнее и может перегрузить Steam или компьютер."
         ),
         "resume": "Докачивать недокачанное (resume)",
         "validate": "Проверять файлы после загрузки (validate)",
