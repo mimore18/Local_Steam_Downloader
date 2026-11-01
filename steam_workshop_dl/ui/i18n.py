@@ -100,8 +100,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "options": "Download options",
         "threads": "Download threads:",
         "threads_hint": (
-            "1 — one SteamCMD batch; 2–4 — parallel, "
-            "one SteamCMD process per thread."
+            "1 — one SteamCMD batch; 2–16 — parallel, one SteamCMD process "
+            "per thread. For large collections 8–12 threads with the dynamic "
+            "queue are usually fastest."
         ),
         "threads_each_mod": "One per mod",
         "unstable": "Unstable mode",
@@ -208,8 +209,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "options": "Параметры загрузки",
         "threads": "Потоков загрузки:",
         "threads_hint": (
-            "1 — один запуск SteamCMD; 2–4 — параллельно, "
-            "по одному процессу SteamCMD на поток."
+            "1 — один запуск SteamCMD; 2–16 — параллельно, по одному процессу "
+            "SteamCMD на поток. На больших коллекциях обычно быстрее всего "
+            "8–12 потоков с динамической очередью."
         ),
         "threads_each_mod": "Каждый мод отдельно",
         "unstable": "Нестабильный режим",

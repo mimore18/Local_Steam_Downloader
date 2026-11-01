@@ -18,7 +18,13 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 from ..app.downloader import Downloader
 from ..app.resolver import Resolver
 from ..core.errors import WorkshopError, WrongTargetTypeError
-from ..core.models import ItemStatus, Settings, Summary, WorkshopNode
+from ..core.models import (
+    MAX_DOWNLOAD_THREADS,
+    ItemStatus,
+    Settings,
+    Summary,
+    WorkshopNode,
+)
 from ..core.naming import human_size
 from ..core.tree import selected_items
 from ..resources import asset_path
@@ -141,7 +147,7 @@ class App(tk.Tk):
             saved_threads = int(saved_threads)
         except (TypeError, ValueError):
             saved_threads = 1
-        if saved_threads not in {0, 1, 2, 3, 4}:
+        if saved_threads not in set(range(1, MAX_DOWNLOAD_THREADS + 1)) | {0}:
             saved_threads = 1
         self.unstable = tk.BooleanVar(value=bool(preferences.get("unstable", False)))
         if saved_threads == 0 and not self.unstable.get():
@@ -449,7 +455,10 @@ class App(tk.Tk):
         ttk.Label(threads_row, text=t("threads")).pack(side="left")
 
         def thread_labels() -> dict[str, str]:
-            labels = {str(number): str(number) for number in range(1, 5)}
+            labels = {
+                str(number): str(number)
+                for number in range(1, MAX_DOWNLOAD_THREADS + 1)
+            }
             if self.unstable.get():
                 labels[t("threads_each_mod")] = "0"
             return labels

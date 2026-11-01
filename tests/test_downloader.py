@@ -138,6 +138,7 @@ def test_worker_count_modes() -> None:
     assert Downloader._worker_count(Settings(download_threads=1), 5) == 1
     assert Downloader._worker_count(Settings(download_threads=3), 5) == 3
     assert Downloader._worker_count(Settings(download_threads=4), 2) == 2
+    assert Downloader._worker_count(Settings(download_threads=12), 54) == 12
     assert (
         Downloader._worker_count(
             Settings(download_threads=0, unstable=True), 7

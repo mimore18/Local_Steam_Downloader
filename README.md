@@ -19,7 +19,7 @@ A simple Steam Workshop downloader with a GUI and a CLI:
 - checkbox selection for individual mods;
 - anonymous login or a Steam account with Steam Guard;
 - automatic SteamCMD setup on first use;
-- parallel downloads (1–4 threads), a dynamic work queue and an optional
+- parallel downloads (1–16 threads), a dynamic work queue and an optional
   one-SteamCMD-per-mod mode;
 - installs finished mods while other downloads are still running;
 - resume, file validation and optional ZIP packaging.
@@ -214,9 +214,10 @@ In the GUI open **“Settings…” → “Interface” → “Theme”**.
 
 In the GUI open **“Settings…” → “Download options”**.
 
-- **Download threads**: `1` runs one sequential SteamCMD batch; `2–4` start
+- **Download threads**: `1` runs one sequential SteamCMD batch; `2–16` start
   several SteamCMD processes in parallel. Each thread logs in once and then
-  downloads its share of the selected mods.
+  downloads its share of the selected mods. For large collections, `8–12`
+  threads with the dynamic queue are usually the fastest stable choice.
 - **Dynamic work queue** (enabled by default) keeps one SteamCMD per thread and
   hands it the next mod as soon as it becomes free, instead of pre-splitting the
   list into fixed chunks. This removes the slow “tail” when mods have very
@@ -226,7 +227,7 @@ In the GUI open **“Settings…” → “Download options”**.
   first successful SteamCMD run, saving several seconds per download.
 - **Unstable mode** adds **One per mod** to the selector and starts a separate
   SteamCMD process for every selected mod. This has the highest startup and
-  login overhead and is usually slower than 1–4 threads.
+  login overhead and is usually slower than 2–16 threads.
 - Parallel mode may hit Steam rate limits or overload the computer. Start with
   2 threads if you are unsure; use 1 if parallelism makes downloads slower.
 
@@ -247,7 +248,7 @@ corresponding checkbox in the settings.
 - Access to Steam Workshop and Valve servers is required.
 - Paid or private mods need an account with access.
 - SteamCMD downloads files sequentially, so large collections take time.
-  Raise the number of download threads to 2–4 if your connection allows it.
+  Raise the number of download threads to 8–12 if your connection allows it.
 
 ---
 
@@ -264,7 +265,7 @@ corresponding checkbox in the settings.
 - выбор нужных модов галочками;
 - анонимный вход или аккаунт Steam со Steam Guard;
 - автоматическая установка SteamCMD при первом запуске;
-- параллельная загрузка (1–4 потока), динамическая очередь и необязательный
+- параллельная загрузка (1–16 потоков), динамическая очередь и необязательный
   режим «каждый мод в своём SteamCMD»;
 - установка готовых модов параллельно с продолжающейся загрузкой;
 - докачка, проверка файлов и упаковка в ZIP.
@@ -460,8 +461,9 @@ python run_cli.py 123456789 --login МОЙ_ЛОГИН
 В GUI откройте **«Настройки…» → «Параметры загрузки»**.
 
 - **Потоков загрузки**: `1` — один последовательный запуск SteamCMD;
-  `2–4` — несколько процессов SteamCMD одновременно. Каждый поток один раз
-  входит в Steam, а затем скачивает свою часть модов.
+  `2–16` — несколько процессов SteamCMD одновременно. Каждый поток один раз
+  входит в Steam, а затем скачивает свою часть модов. На больших коллекциях
+  обычно быстрее всего `8–12` потоков с динамической очередью.
 - **Динамическая очередь** (включена по умолчанию) держит один SteamCMD на
   поток и выдаёт следующий мод сразу после завершения предыдущего, а не режет
   список на фиксированные части заранее. Это убирает «хвост», когда моды
@@ -472,7 +474,7 @@ python run_cli.py 123456789 --login МОЙ_ЛОГИН
   первого успешного запуска SteamCMD — это экономит несколько секунд.
 - **Нестабильный режим** добавляет в список вариант **«Каждый мод отдельно»**
   и запускает отдельный SteamCMD для каждого выбранного мода. У этого режима
-  самые большие накладные расходы, и обычно он медленнее 1–4 потоков.
+  самые большие накладные расходы, и обычно он медленнее 2–16 потоков.
 - Параллельный режим может упереться в ограничения Steam или перегрузить
   компьютер. Если не уверены, начните с 2 потоков; если параллельность
   замедляет загрузку, используйте 1.
@@ -493,7 +495,7 @@ python run_cli.py 123456789 --login МОЙ_ЛОГИН
 - Нужен доступ к Steam Workshop и серверам Valve.
 - Для платных или приватных модов нужен аккаунт с доступом.
 - SteamCMD скачивает файлы последовательно, поэтому большие коллекции
-  загружаются не мгновенно. Увеличьте число потоков до 2–4, если позволяет
+  загружаются не мгновенно. Увеличьте число потоков до 8–12, если позволяет
   соединение.
 
 ---

@@ -13,6 +13,9 @@ class NodeKind(StrEnum):
     ITEM = "item"
 
 
+MAX_DOWNLOAD_THREADS = 16
+
+
 class ItemStatus(StrEnum):
     PENDING = "pending"
     DOWNLOADING = "downloading"
@@ -109,7 +112,7 @@ class Settings:
             raise ValueError(f"unknown target type: {self.target_type!r}")
         if self.auth_mode not in {"anonymous", "login"}:
             raise ValueError(f"unknown auth mode: {self.auth_mode!r}")
-        if self.download_threads not in {0, 1, 2, 3, 4}:
+        if self.download_threads not in set(range(1, MAX_DOWNLOAD_THREADS + 1)) | {0}:
             raise ValueError(
                 f"unknown download thread count: {self.download_threads!r}"
             )

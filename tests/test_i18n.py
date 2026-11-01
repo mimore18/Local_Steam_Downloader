@@ -277,7 +277,7 @@ def test_gui_threads_and_unstable_settings(app) -> None:
         widget for widget in _walk(dialog) if isinstance(widget, tk.ttk.Combobox)
     ]
     threads_combo = combos[2]
-    assert list(threads_combo.cget("values")) == ["1", "2", "3", "4"]
+    assert list(threads_combo.cget("values")) == [str(n) for n in range(1, 17)]
 
     unstable = next(
         widget
