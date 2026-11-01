@@ -63,7 +63,7 @@ def test_run_respects_explicit_items(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
         Downloader,
         "_download_pass",
-        lambda self, steamcmd, items, settings, events, cancel: {
+        lambda self, steamcmd, items, settings, events, cancel, on_downloaded=None: {
             item.id: tmp_path / "source" for item in items
         },
     )
@@ -188,4 +188,138 @@ def test_split_balanced_keeps_all_items() -> None:
         "2",
         "3",
         "4",
+    ]
+
+
+def test_preflight_login_is_skipped_after_first_run(monkeypatch, tmp_path: Path) -> None:
+    node = make_node("111", "First")
+    root = WorkshopNode(id="1", kind=NodeKind.COLLECTION, title="Collection")
+    root.children = [node]
+    steamcmd = tmp_path / "steamcmd.sh"
+    steamcmd.write_text("#!/bin/sh\n", encoding="utf-8")
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        downloader_module, "ensure_steamcmd", lambda _settings, _events: steamcmd
+    )
+    monkeypatch.setattr(
+        downloader_module,
+        "ensure_login",
+        lambda settings, *args, **kwargs: calls.append(settings.auth_mode),
+    )
+    monkeypatch.setattr(
+        Downloader,
+        "_download_pass",
+        lambda self, cmd, items, settings, events, cancel, on_downloaded=None: {
+            item.id: None for item in items
+        },
+    )
+
+    settings = Settings(output_dir=tmp_path / "out", retries=0)
+    Downloader().run(settings, root=root, items=[node])
+    assert calls == ["anonymous"]
+    assert downloader_module.steamcmd_initialized(steamcmd)
+
+    Downloader().run(settings, root=root, items=[node])
+    assert calls == ["anonymous"]
+
+    Downloader().run(
+        Settings(output_dir=tmp_path / "out", retries=0, auth_mode="login", username="u"),
+        root=root,
+        items=[node],
+    )
+    assert calls == ["anonymous", "login"]
+
+
+def test_install_runs_while_download_pass_is_still_active(
+    monkeypatch, tmp_path: Path
+) -> None:
+    first = make_node("111", "First")
+    second = make_node("222", "Second")
+    root = WorkshopNode(id="1", kind=NodeKind.COLLECTION, title="Collection")
+    root.children = [first, second]
+    source = make_source(tmp_path)
+    installed = Event()
+
+    def fake_install(self, node, source_path, settings):
+        installed.set()
+        return Path(node.id)
+
+    def fake_pass(
+        self, cmd, items, settings, events, cancel, on_downloaded=None
+    ):
+        assert on_downloaded is not None
+        on_downloaded(items[0], source)
+        assert installed.wait(timeout=5), "installer did not start during download"
+        return {item.id: source for item in items}
+
+    monkeypatch.setattr(Downloader, "_install", fake_install)
+    monkeypatch.setattr(Downloader, "_download_pass", fake_pass)
+
+    summary = Downloader().run(
+        Settings(output_dir=tmp_path / "out", retries=0),
+        root=root,
+        items=[first, second],
+    )
+
+    assert summary.done == 2
+    assert first.status is ItemStatus.DONE
+    assert second.status is ItemStatus.DONE
+
+
+def test_dynamic_queue_streams_items_through_persistent_workers(
+    monkeypatch, tmp_path: Path
+) -> None:
+    nodes = [make_node(str(100 + index), f"Mod {index}") for index in range(6)]
+    sources = {}
+    for node in nodes:
+        folder = tmp_path / node.id
+        folder.mkdir()
+        (folder / "file.txt").write_text("data", encoding="utf-8")
+        sources[node.id] = folder
+
+    created: list[object] = []
+
+    class FakeWorker:
+        def __init__(self, executable, *, login, timeout=60.0):
+            created.append(self)
+            self.downloaded: list[str] = []
+
+        @property
+        def alive(self) -> bool:
+            return True
+
+        def wait_login(self, on_line, *, cancel=None, timeout=None) -> bool:
+            on_line("Waiting for user info...OK")
+            return True
+
+        def download_item(
+            self, node, on_line, *, cancel=None, validate=False
+        ):
+            self.downloaded.append(node.id)
+            folder = sources[node.id]
+            on_line(f"Downloading item {node.id} ...")
+            on_line(f'Success. Downloaded item {node.id} to "{folder}" (4 bytes)')
+            return folder
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr(downloader_module, "InteractiveSteamCmd", FakeWorker)
+
+    notified: list[str] = []
+    found = Downloader()._download_pass(
+        Path("/bin/true"),
+        nodes,
+        Settings(download_threads=2),
+        NullEvents(),
+        Event(),
+        lambda node, path: notified.append(node.id),
+    )
+
+    assert all(found[node.id] == sources[node.id] for node in nodes)
+    assert 1 <= len(created) <= 2
+    assert sorted(notified) == [node.id for node in nodes]
+    assert sorted(item for worker in created for item in worker.downloaded) == [
+        node.id for node in nodes
     ]

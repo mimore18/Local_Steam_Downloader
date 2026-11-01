@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import locale
 import os
+import queue
 import re
 import shutil
 import subprocess
 import sys
+import threading
+import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -238,3 +241,147 @@ def run_script(
     except BaseException:
         terminate_process(process)
         raise
+
+
+class InteractiveSteamCmd:
+    """A long-lived SteamCMD console driven through stdin.
+
+    The process logs in once and then accepts any number of
+    ``workshop_download_item`` commands.  This avoids paying the login and
+    update-check cost for every mod when a dynamic work queue is used.
+    """
+
+    def __init__(
+        self,
+        executable: Path,
+        *,
+        login: str,
+        timeout: float = 60.0,
+    ) -> None:
+        self.timeout = timeout
+        self.process = subprocess.Popen(
+            [str(executable), "+login", login],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            bufsize=0,
+            **popen_kwargs(),  # type: ignore[arg-type]
+        )
+        self._lines: queue.Queue[str | None] = queue.Queue()
+        self._reader = threading.Thread(
+            target=self._read_lines, name="steamcmd-reader", daemon=True
+        )
+        self._reader.start()
+
+    @property
+    def alive(self) -> bool:
+        return self.process.poll() is None
+
+    def _read_lines(self) -> None:
+        stream = self.process.stdout
+        assert stream is not None
+        try:
+            for raw in stream:
+                for text in decode_steamcmd(raw).split("\r"):
+                    text = text.strip()
+                    if text:
+                        self._lines.put(text)
+        finally:
+            self._lines.put(None)
+
+    def send(self, command: str) -> None:
+        stream = self.process.stdin
+        if stream is None:
+            raise OSError("SteamCMD stdin is closed")
+        stream.write((command + "\n").encode("utf-8"))
+        stream.flush()
+
+    def next_line(
+        self,
+        *,
+        deadline: float | None = None,
+        cancel: Callable[[], bool] | None = None,
+    ) -> str | None:
+        while True:
+            if cancel and cancel():
+                return None
+            if deadline is not None and time.monotonic() >= deadline:
+                return None
+            try:
+                return self._lines.get(timeout=0.2)
+            except queue.Empty:
+                if self.process.poll() is not None:
+                    try:
+                        return self._lines.get_nowait()
+                    except queue.Empty:
+                        return None
+                continue
+
+    def wait_login(
+        self,
+        on_line: Callable[[str], None],
+        *,
+        cancel: Callable[[], bool] | None = None,
+        timeout: float | None = None,
+    ) -> bool:
+        """Wait for SteamCMD to confirm a login; False on failure/timeout."""
+
+        deadline = time.monotonic() + (timeout or self.timeout)
+        while True:
+            line = self.next_line(deadline=deadline, cancel=cancel)
+            if line is None:
+                return False
+            on_line(line)
+            if LOGIN_FAILED_RE.search(line):
+                return False
+            if LOGIN_OK_RE.search(line):
+                # Keep the console alive after a failed download and never
+                # wait for a password interactively.
+                self.send("@ShutdownOnFailedCommand 0")
+                self.send("@NoPromptForPassword 1")
+                return True
+
+    def download_item(
+        self,
+        node: WorkshopNode,
+        on_line: Callable[[str], None],
+        *,
+        cancel: Callable[[], bool] | None = None,
+        validate: bool = False,
+    ) -> Path | None:
+        """Download one item and return its path, or None on failure."""
+
+        if not node.appid:
+            return None
+        suffix = " validate" if validate else ""
+        self.send(
+            f"workshop_download_item {node.appid} {node.id}{suffix}"
+        )
+        while True:
+            line = self.next_line(cancel=cancel)
+            if line is None:
+                return None
+            on_line(line)
+            parsed = parse_line(line)
+            if parsed is None or parsed.item_id != node.id:
+                continue
+            if parsed.kind == "success":
+                return parsed.path
+            if parsed.kind == "failure":
+                return None
+
+    def close(self) -> None:
+        if self.process.poll() is None:
+            try:
+                self.send("quit")
+            except OSError:
+                pass
+            try:
+                self.process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                terminate_process(self.process)
+        if self.process.stdin is not None:
+            try:
+                self.process.stdin.close()
+            except OSError:
+                pass

@@ -1,7 +1,11 @@
+import os
 from pathlib import Path
+
+import pytest
 
 from steam_workshop_dl.core.models import NodeKind, WorkshopNode
 from steam_workshop_dl.services.steamcmd import (
+    InteractiveSteamCmd,
     build_command,
     decode_steamcmd,
     parse_line,
@@ -85,3 +89,41 @@ def test_write_runscript(tmp_path: Path) -> None:
 def test_build_command() -> None:
     command = build_command(Path("/opt/steamcmd.sh"), Path("/tmp/script.txt"))
     assert command == ["/opt/steamcmd.sh", "+runscript", "/tmp/script.txt", "+quit"]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="uses a POSIX shell stub")
+def test_interactive_steamcmd_reuses_one_process(tmp_path: Path) -> None:
+    stub = tmp_path / "steamcmd.sh"
+    stub.write_text(
+        r"""#!/bin/sh
+echo "Waiting for user info...OK"
+while IFS= read -r line; do
+  case "$line" in
+    @*) ;;
+    quit) exit 0 ;;
+    workshop_download_item*)
+      set -- $line
+      echo "Success. Downloaded item $3 to \"/tmp/$3\" (4 bytes)"
+      ;;
+  esac
+done
+""",
+        encoding="utf-8",
+    )
+    stub.chmod(0o755)
+    worker = InteractiveSteamCmd(stub, login="anonymous", timeout=5)
+    try:
+        assert worker.wait_login(lambda _line: None)
+        first = worker.download_item(
+            WorkshopNode(id="111", kind=NodeKind.ITEM, appid=4000),
+            lambda _line: None,
+        )
+        second = worker.download_item(
+            WorkshopNode(id="222", kind=NodeKind.ITEM, appid=4000),
+            lambda _line: None,
+        )
+    finally:
+        worker.close()
+
+    assert first == Path("/tmp/111")
+    assert second == Path("/tmp/222")

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+import queue
 import shutil
 import tempfile
 import threading
@@ -15,6 +16,7 @@ import time
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Callable
 
 from ..core.errors import DownloadError
 from ..core.events import Events, NullEvents
@@ -25,12 +27,17 @@ from ..services.auth import ConsolePrompter, Prompter, ensure_login
 from ..services.manifest import Manifest
 from ..services.steam_api import SteamAPI
 from ..services.steamcmd import (
+    InteractiveSteamCmd,
     content_path,
     parse_line,
     run_script,
     write_runscript,
 )
-from ..services.steamcmd_setup import ensure_steamcmd
+from ..services.steamcmd_setup import (
+    ensure_steamcmd,
+    mark_steamcmd_initialized,
+    steamcmd_initialized,
+)
 from .resolver import Resolver
 
 log = logging.getLogger(__name__)
@@ -105,15 +112,20 @@ class Downloader:
             return summary
 
         steamcmd = ensure_steamcmd(settings, events)
-        ensure_login(
-            settings,
-            prompter or ConsolePrompter(),
-            events,
-            executable=steamcmd,
-        )
+        # Anonymous mode logs in inside every download worker, so the separate
+        # pre-flight process is pure overhead after the first successful run.
+        # Account mode still needs the pre-flight step to cache credentials and
+        # ask for a password/Steam Guard code once.
+        if settings.auth_mode == "login" or not steamcmd_initialized(steamcmd):
+            ensure_login(
+                settings,
+                prompter or ConsolePrompter(),
+                events,
+                executable=steamcmd,
+            )
+            mark_steamcmd_initialized(steamcmd)
 
         total = len(pending)
-        done = 0
         for attempt in range(settings.retries + 1):
             if not pending or cancel.is_set():
                 break
@@ -122,33 +134,69 @@ class Downloader:
                 if cancel.wait(2**attempt):
                     break
 
-            failed = self._download_pass(
-                steamcmd, pending, settings, events, cancel
+            install_jobs: queue.Queue[
+                tuple[WorkshopNode, Path] | None
+            ] = queue.Queue()
+            install_failures: dict[str, str] = {}
+            notified: set[str] = set()
+            notified_lock = threading.Lock()
+
+            def notify(node: WorkshopNode, source: Path) -> None:
+                with notified_lock:
+                    if node.id in notified:
+                        return
+                    notified.add(node.id)
+                install_jobs.put((node, source))
+
+            installer = threading.Thread(
+                target=self._install_worker,
+                args=(
+                    install_jobs,
+                    settings,
+                    events,
+                    manifest,
+                    summary,
+                    total,
+                    cancel,
+                    install_failures,
+                ),
+                name="swdl-install",
+                daemon=True,
             )
+            installer.start()
+            failed: dict[str, Path | None] = {}
+            try:
+                failed = self._download_pass(
+                    steamcmd, pending, settings, events, cancel, notify
+                )
+                # ``_download_pass`` normally reports successes as they arrive;
+                # this also covers fallback paths and custom download adapters.
+                for node in pending:
+                    source = failed.get(node.id)
+                    if source is not None:
+                        notify(node, source)
+            finally:
+                install_jobs.put(None)
+                installer.join()
+
             still_pending: list[WorkshopNode] = []
             for node in pending:
+                if node.status is ItemStatus.DONE:
+                    continue
                 source = failed.get(node.id)
                 if source is None:
                     node.status = ItemStatus.FAILED
                     events.item_status(node.id, ItemStatus.FAILED, "нет папки после SteamCMD")
                     still_pending.append(node)
-                    continue
-                try:
-                    relative = self._install(node, source, settings)
-                except (OSError, DownloadError) as exc:
-                    log.exception("copy failed for %s", node.id)
+                elif node.id in install_failures:
                     node.status = ItemStatus.FAILED
-                    events.item_status(node.id, ItemStatus.FAILED, str(exc))
+                    events.item_status(
+                        node.id, ItemStatus.FAILED, install_failures[node.id]
+                    )
                     still_pending.append(node)
-                    continue
-
-                node.status = ItemStatus.DONE
-                manifest.mark(node, relative)
-                events.item_status(node.id, ItemStatus.DONE, str(relative))
-                summary.done += 1
-                summary.total_bytes += node.size or 0
-                done += 1
-                events.progress(done, total, node.id)
+                else:
+                    # Canceled before the installer reached this item.
+                    still_pending.append(node)
 
             pending = still_pending
 
@@ -161,6 +209,39 @@ class Downloader:
         summary.elapsed = time.monotonic() - started
         events.finished(summary)
         return summary
+
+    def _install_worker(
+        self,
+        jobs: queue.Queue[tuple[WorkshopNode, Path] | None],
+        settings: Settings,
+        events: Events,
+        manifest: Manifest,
+        summary: Summary,
+        total: int,
+        cancel: threading.Event,
+        failures: dict[str, str],
+    ) -> None:
+        """Install items while download workers keep running."""
+
+        while True:
+            job = jobs.get()
+            if job is None:
+                return
+            node, source = job
+            if cancel.is_set():
+                continue
+            try:
+                relative = self._install(node, source, settings)
+            except (OSError, DownloadError) as exc:
+                log.exception("copy failed for %s", node.id)
+                failures[node.id] = str(exc)
+                continue
+            node.status = ItemStatus.DONE
+            manifest.mark(node, relative)
+            summary.done += 1
+            summary.total_bytes += node.size or 0
+            events.item_status(node.id, ItemStatus.DONE, str(relative))
+            events.progress(summary.done, total, node.id)
 
     @staticmethod
     def _worker_count(settings: Settings, item_count: int) -> int:
@@ -177,24 +258,66 @@ class Downloader:
         settings: Settings,
         events: Events,
         cancel: threading.Event,
+        on_downloaded: Callable[[WorkshopNode, Path], None] | None = None,
     ) -> dict[str, Path | None]:
         """Run one SteamCMD pass and return item_id -> source path."""
 
         workers = self._worker_count(settings, len(items))
+        per_mod = settings.unstable and settings.download_threads == 0
+        reported: set[str] = set()
+        report_lock = threading.Lock()
+
+        def report(node: WorkshopNode, source: Path) -> None:
+            if on_downloaded is None:
+                return
+            with report_lock:
+                if node.id in reported:
+                    return
+                reported.add(node.id)
+            on_downloaded(node, source)
+
         if workers == 1:
             found = self._download_batch(steamcmd, items, settings, events, cancel)
         else:
-            if settings.unstable and settings.download_threads == 0:
+            if per_mod:
                 events.log(
                     "info",
                     f"Нестабильный режим: {workers} SteamCMD одновременно.",
                 )
+            elif settings.dynamic_queue:
+                events.log(
+                    "info",
+                    f"Динамическая очередь: {workers} поток(ов).",
+                )
             else:
                 events.log("info", f"Параллельная загрузка: {workers} поток(ов).")
-            found = self._download_parallel(
-                steamcmd, items, settings, events, cancel, workers
-            )
-        return self._apply_fallbacks(steamcmd, items, found)
+            if settings.dynamic_queue and not per_mod:
+                found = self._download_dynamic(
+                    steamcmd,
+                    items,
+                    settings,
+                    events,
+                    cancel,
+                    workers,
+                    report,
+                )
+            else:
+                found = self._download_parallel(
+                    steamcmd,
+                    items,
+                    settings,
+                    events,
+                    cancel,
+                    workers,
+                    report,
+                )
+        found = self._apply_fallbacks(steamcmd, items, found)
+        if on_downloaded is not None:
+            for node in items:
+                source = found.get(node.id)
+                if source is not None:
+                    report(node, source)
+        return found
 
     def _download_batch(
         self,
@@ -237,6 +360,7 @@ class Downloader:
         events: Events,
         cancel: threading.Event,
         workers: int,
+        on_downloaded: Callable[[WorkshopNode, Path], None] | None = None,
     ) -> dict[str, Path | None]:
         chunks = self._split_balanced(items, workers)
         events.log(
@@ -247,9 +371,15 @@ class Downloader:
         def run_chunk(chunk: list[WorkshopNode]) -> dict[str, Path | None]:
             if cancel.is_set():
                 return {node.id: None for node in chunk}
-            return self._download_batch(
+            part = self._download_batch(
                 steamcmd, chunk, settings, events, cancel
             )
+            if on_downloaded is not None:
+                for node in chunk:
+                    source = part.get(node.id)
+                    if source is not None:
+                        on_downloaded(node, source)
+            return part
 
         found: dict[str, Path | None] = {node.id: None for node in items}
         with ThreadPoolExecutor(
@@ -257,6 +387,89 @@ class Downloader:
         ) as pool:
             for part in pool.map(run_chunk, chunks):
                 found.update(part)
+        return found
+
+    def _download_dynamic(
+        self,
+        steamcmd: Path,
+        items: list[WorkshopNode],
+        settings: Settings,
+        events: Events,
+        cancel: threading.Event,
+        workers: int,
+        on_downloaded: Callable[[WorkshopNode, Path], None] | None = None,
+    ) -> dict[str, Path | None]:
+        """Feed one shared queue to long-lived SteamCMD workers.
+
+        Each worker logs in once and then takes the next item as soon as its
+        previous download finishes, so fast workers do not wait for slow ones.
+        """
+
+        pending: queue.Queue[WorkshopNode] = queue.Queue()
+        for node in items:
+            pending.put(node)
+        found: dict[str, Path | None] = {node.id: None for node in items}
+        by_id = {node.id: node for node in items}
+        result_lock = threading.Lock()
+        login = (
+            "anonymous"
+            if settings.auth_mode == "anonymous"
+            else (settings.username or "")
+        )
+
+        def run_worker() -> None:
+            if cancel.is_set():
+                return
+            try:
+                worker = InteractiveSteamCmd(
+                    steamcmd,
+                    login=login,
+                    timeout=max(settings.timeout, 120.0),
+                )
+            except OSError as exc:
+                events.log("error", f"SteamCMD не запустился: {exc}")
+                return
+            state: dict[str, object] = {"current": None, "percent": {}}
+            try:
+                if not worker.wait_login(
+                    lambda line: events.log("debug", line),
+                    cancel=cancel.is_set,
+                ):
+                    events.log(
+                        "error",
+                        "SteamCMD: не удалось войти в динамическом режиме.",
+                    )
+                    return
+                while not cancel.is_set():
+                    try:
+                        node = pending.get_nowait()
+                    except queue.Empty:
+                        break
+                    source = worker.download_item(
+                        node,
+                        lambda line: self._handle_line(
+                            line, found, by_id, state, events
+                        ),
+                        cancel=cancel.is_set,
+                        validate=settings.validate,
+                    )
+                    with result_lock:
+                        found[node.id] = source
+                    if source is not None and on_downloaded is not None:
+                        on_downloaded(node, source)
+                    if not worker.alive:
+                        break
+            except OSError as exc:
+                events.log("error", f"SteamCMD: {exc}")
+            finally:
+                worker.close()
+
+        with ThreadPoolExecutor(
+            max_workers=workers, thread_name_prefix="swdl"
+        ) as pool:
+            futures = [pool.submit(run_worker) for _ in range(workers)]
+            for future in futures:
+                future.result()
         return found
 
     @staticmethod

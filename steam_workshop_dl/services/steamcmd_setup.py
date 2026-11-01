@@ -9,6 +9,7 @@ otherwise lives in the per-user data directory.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import sys
@@ -28,6 +29,7 @@ from .config import APP_NAME
 from .steamcmd import find_steamcmd
 
 ENV_STEAMCMD_DIR = "STEAM_WORKSHOP_STEAMCMD_DIR"
+READY_MARKER = ".steam-workshop-dl-ready"
 USER_AGENT = "steam-workshop-dl/0.1 (+https://github.com/mimore18/Local_Steam_Downloader)"
 
 LINUX_ARCHIVE = "steamcmd_linux.tar.gz"
@@ -40,6 +42,38 @@ DOWNLOAD_TIMEOUT = 120.0
 
 def _is_windows() -> bool:
     return sys.platform.startswith("win")
+
+
+def _fallback_marker(executable: Path) -> Path:
+    digest = hashlib.sha256(
+        str(executable.resolve()).encode("utf-8")
+    ).hexdigest()[:16]
+    return _user_data_dir() / APP_NAME / "steamcmd-ready" / f"{digest}.marker"
+
+
+def steamcmd_initialized(executable: Path) -> bool:
+    """Whether SteamCMD completed at least one login/update run."""
+
+    return (
+        (executable.parent / READY_MARKER).is_file()
+        or _fallback_marker(executable).is_file()
+    )
+
+
+def mark_steamcmd_initialized(executable: Path) -> None:
+    """Remember a successful SteamCMD run, even for read-only installs."""
+
+    try:
+        (executable.parent / READY_MARKER).touch()
+        return
+    except OSError:
+        pass
+    fallback = _fallback_marker(executable)
+    try:
+        fallback.parent.mkdir(parents=True, exist_ok=True)
+        fallback.touch()
+    except OSError:
+        pass
 
 
 def _user_data_dir() -> Path:
@@ -160,6 +194,11 @@ def bootstrap_steamcmd(
     if force:
         shutil.rmtree(folder, ignore_errors=True)
     folder.mkdir(parents=True, exist_ok=True)
+    for marker in (folder / READY_MARKER, _fallback_marker(executable)):
+        try:
+            marker.unlink()
+        except OSError:
+            pass
 
     url = BASE_URL + archive_name()
     events.log("info", f"SteamCMD не найден. Скачивание: {url}")

@@ -109,6 +109,11 @@ MESSAGES: dict[str, dict[str, str]] = {
             "Adds “one SteamCMD per mod” to the thread selector. "
             "Usually slower and may overload Steam or the PC."
         ),
+        "dynamic_queue": "Dynamic work queue",
+        "dynamic_queue_hint": (
+            "Keeps one SteamCMD per thread and gives it the next mod as soon "
+            "as it finishes, instead of pre-splitting the list. Recommended."
+        ),
         "resume": "Resume incomplete downloads",
         "validate": "Validate files after download",
         "zip": "Pack each mod into a ZIP",
@@ -211,6 +216,12 @@ MESSAGES: dict[str, dict[str, str]] = {
         "unstable_hint": (
             "Добавляет в выбор потоков режим «каждый мод в своём SteamCMD». "
             "Обычно медленнее и может перегрузить Steam или компьютер."
+        ),
+        "dynamic_queue": "Динамическая очередь",
+        "dynamic_queue_hint": (
+            "Держит один SteamCMD на поток и выдаёт следующий мод сразу после "
+            "завершения предыдущего, без заранее нарезанных списков. "
+            "Рекомендуется."
         ),
         "resume": "Докачивать недокачанное (resume)",
         "validate": "Проверять файлы после загрузки (validate)",

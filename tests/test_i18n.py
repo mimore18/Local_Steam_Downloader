@@ -310,6 +310,41 @@ def test_gui_threads_and_unstable_settings(app) -> None:
     assert data["unstable"] is True
 
 
+def test_gui_dynamic_queue_default_and_persistence(app) -> None:
+    import json
+
+    instance, config_dir = app
+    assert instance.dynamic_queue.get() is True
+
+    instance._open_settings()
+    dialog = next(
+        widget
+        for widget in instance.winfo_children()
+        if isinstance(widget, tk.Toplevel)
+    )
+    dynamic = next(
+        widget
+        for widget in _walk(dialog)
+        if isinstance(widget, tk.ttk.Checkbutton)
+        and widget.cget("text") == "Динамическая очередь"
+    )
+    dynamic.invoke()
+    save = next(
+        widget
+        for widget in _walk(dialog)
+        if isinstance(widget, tk.ttk.Button)
+        and widget.cget("text") in {"Сохранить", "Save"}
+    )
+    save.invoke()
+    instance.update()
+
+    assert instance.dynamic_queue.get() is False
+    assert instance._settings().dynamic_queue is False
+    preferences = config_dir / "steam-workshop-dl" / "gui.json"
+    data = json.loads(preferences.read_text(encoding="utf-8"))
+    assert data["dynamic_queue"] is False
+
+
 def test_gui_remembers_saved_theme(app) -> None:
     import json
 

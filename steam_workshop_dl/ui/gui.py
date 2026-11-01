@@ -147,6 +147,9 @@ class App(tk.Tk):
         if saved_threads == 0 and not self.unstable.get():
             saved_threads = 1
         self.download_threads = tk.IntVar(value=saved_threads)
+        self.dynamic_queue = tk.BooleanVar(
+            value=bool(preferences.get("dynamic_queue", True))
+        )
         self.status = tk.StringVar(value=self.t("ready"))
         self.totals = tk.StringVar(value=self.t("list_not_loaded"))
 
@@ -484,6 +487,14 @@ class App(tk.Tk):
         ttk.Label(
             options, text=t("unstable_hint"), foreground="#666666"
         ).pack(anchor="w", pady=(0, 8))
+        ttk.Checkbutton(
+            options,
+            text=t("dynamic_queue"),
+            variable=self.dynamic_queue,
+        ).pack(anchor="w")
+        ttk.Label(
+            options, text=t("dynamic_queue_hint"), foreground="#666666"
+        ).pack(anchor="w", pady=(0, 8))
 
         for key, variable in (
             ("resume", self.resume),
@@ -502,6 +513,7 @@ class App(tk.Tk):
             self.zip_items,
             self.download_threads,
             self.unstable,
+            self.dynamic_queue,
         )
         before = [(variable, variable.get()) for variable in variables]
 
@@ -528,6 +540,7 @@ class App(tk.Tk):
                         "theme": self.theme.get(),
                         "download_threads": int(selected_threads),
                         "unstable": bool(self.unstable.get()),
+                        "dynamic_queue": bool(self.dynamic_queue.get()),
                     }
                 )
             except OSError:
@@ -561,6 +574,7 @@ class App(tk.Tk):
             zip_items=self.zip_items.get(),
             download_threads=self.download_threads.get(),
             unstable=self.unstable.get(),
+            dynamic_queue=self.dynamic_queue.get(),
         )
 
     # ------------------------------------------------------------------ actions

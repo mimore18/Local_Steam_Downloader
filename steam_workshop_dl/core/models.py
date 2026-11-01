@@ -97,6 +97,7 @@ class Settings:
     metadata_workers: int = 4
     download_threads: int = 1
     unstable: bool = False
+    dynamic_queue: bool = True
     timeout: float = 30.0
     dry_run: bool = False
     only: set[str] = field(default_factory=set)

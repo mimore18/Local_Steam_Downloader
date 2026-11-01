@@ -19,7 +19,9 @@ A simple Steam Workshop downloader with a GUI and a CLI:
 - checkbox selection for individual mods;
 - anonymous login or a Steam account with Steam Guard;
 - automatic SteamCMD setup on first use;
-- parallel downloads (1–4 threads) with an optional one-SteamCMD-per-mod mode;
+- parallel downloads (1–4 threads), a dynamic work queue and an optional
+  one-SteamCMD-per-mod mode;
+- installs finished mods while other downloads are still running;
 - resume, file validation and optional ZIP packaging.
 
 > Only content available to the signed-in account can be downloaded.
@@ -214,7 +216,14 @@ In the GUI open **“Settings…” → “Download options”**.
 
 - **Download threads**: `1` runs one sequential SteamCMD batch; `2–4` start
   several SteamCMD processes in parallel. Each thread logs in once and then
-  downloads its balanced share of the selected mods sequentially.
+  downloads its share of the selected mods.
+- **Dynamic work queue** (enabled by default) keeps one SteamCMD per thread and
+  hands it the next mod as soon as it becomes free, instead of pre-splitting the
+  list into fixed chunks. This removes the slow “tail” when mods have very
+  different sizes. Turn it off to use the older balanced-chunk schedule.
+- Copying or packing a finished mod starts immediately while other threads are
+  still downloading. The anonymous pre-flight login is also skipped after the
+  first successful SteamCMD run, saving several seconds per download.
 - **Unstable mode** adds **One per mod** to the selector and starts a separate
   SteamCMD process for every selected mod. This has the highest startup and
   login overhead and is usually slower than 1–4 threads.
@@ -255,7 +264,9 @@ corresponding checkbox in the settings.
 - выбор нужных модов галочками;
 - анонимный вход или аккаунт Steam со Steam Guard;
 - автоматическая установка SteamCMD при первом запуске;
-- параллельная загрузка (1–4 потока) и необязательный режим «каждый мод в своём SteamCMD»;
+- параллельная загрузка (1–4 потока), динамическая очередь и необязательный
+  режим «каждый мод в своём SteamCMD»;
+- установка готовых модов параллельно с продолжающейся загрузкой;
 - докачка, проверка файлов и упаковка в ZIP.
 
 > Скачивается только тот контент, к которому у аккаунта есть доступ.
@@ -450,7 +461,15 @@ python run_cli.py 123456789 --login МОЙ_ЛОГИН
 
 - **Потоков загрузки**: `1` — один последовательный запуск SteamCMD;
   `2–4` — несколько процессов SteamCMD одновременно. Каждый поток один раз
-  входит в Steam, а затем последовательно скачивает свою часть модов.
+  входит в Steam, а затем скачивает свою часть модов.
+- **Динамическая очередь** (включена по умолчанию) держит один SteamCMD на
+  поток и выдаёт следующий мод сразу после завершения предыдущего, а не режет
+  список на фиксированные части заранее. Это убирает «хвост», когда моды
+  сильно отличаются по размеру. Отключите её, чтобы вернуться к балансировке
+  чанками.
+- Копирование или упаковка готового мода начинается сразу, пока другие потоки
+  ещё качают. Повторный анонимный вход перед загрузкой тоже пропускается после
+  первого успешного запуска SteamCMD — это экономит несколько секунд.
 - **Нестабильный режим** добавляет в список вариант **«Каждый мод отдельно»**
   и запускает отдельный SteamCMD для каждого выбранного мода. У этого режима
   самые большие накладные расходы, и обычно он медленнее 1–4 потоков.

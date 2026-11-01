@@ -63,3 +63,8 @@ def test_settings_from_mapping() -> None:
 def test_settings_bootstrap_can_be_disabled() -> None:
     settings = settings_from_mapping({"bootstrap_steamcmd": False})
     assert settings.bootstrap_steamcmd is False
+
+
+def test_dynamic_queue_is_enabled_by_default() -> None:
+    assert settings_from_mapping({}).dynamic_queue is True
+    assert settings_from_mapping({"dynamic_queue": False}).dynamic_queue is False
