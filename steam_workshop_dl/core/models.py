@@ -95,6 +95,8 @@ class Settings:
     force: bool = False
     retries: int = 2
     metadata_workers: int = 4
+    download_threads: int = 1
+    unstable: bool = False
     timeout: float = 30.0
     dry_run: bool = False
     only: set[str] = field(default_factory=set)
@@ -106,6 +108,12 @@ class Settings:
             raise ValueError(f"unknown target type: {self.target_type!r}")
         if self.auth_mode not in {"anonymous", "login"}:
             raise ValueError(f"unknown auth mode: {self.auth_mode!r}")
+        if self.download_threads not in {0, 1, 2, 3, 4}:
+            raise ValueError(
+                f"unknown download thread count: {self.download_threads!r}"
+            )
+        if self.download_threads == 0 and not self.unstable:
+            self.download_threads = 1
 
 
 @dataclass(slots=True)

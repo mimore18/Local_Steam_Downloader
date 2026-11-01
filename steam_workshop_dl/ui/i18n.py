@@ -98,6 +98,14 @@ MESSAGES: dict[str, dict[str, str]] = {
         "username": "Login:",
         "auth_hint": "The password and Steam Guard code will be requested during download.",
         "options": "Download options",
+        "threads": "Download threads:",
+        "threads_hint": "1 — one SteamCMD at a time; 2–4 — parallel downloads.",
+        "threads_each_mod": "One per mod",
+        "unstable": "Unstable mode",
+        "unstable_hint": (
+            "Adds “one SteamCMD per mod” to the thread selector. "
+            "May overload Steam or the PC."
+        ),
         "resume": "Resume incomplete downloads",
         "validate": "Validate files after download",
         "zip": "Pack each mod into a ZIP",
@@ -190,6 +198,14 @@ MESSAGES: dict[str, dict[str, str]] = {
         "username": "Логин:",
         "auth_hint": "Пароль и код Steam Guard будут запрошены при загрузке.",
         "options": "Параметры загрузки",
+        "threads": "Потоков загрузки:",
+        "threads_hint": "1 — один SteamCMD за раз; 2–4 — параллельные загрузки.",
+        "threads_each_mod": "Каждый мод отдельно",
+        "unstable": "Нестабильный режим",
+        "unstable_hint": (
+            "Добавляет в выбор потоков режим «каждый мод в своём SteamCMD». "
+            "Может перегрузить Steam или компьютер."
+        ),
         "resume": "Докачивать недокачанное (resume)",
         "validate": "Проверять файлы после загрузки (validate)",
         "zip": "Упаковывать каждый мод в ZIP",

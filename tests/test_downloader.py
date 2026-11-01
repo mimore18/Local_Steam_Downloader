@@ -1,5 +1,6 @@
 import zipfile
 from pathlib import Path
+from threading import Barrier, Event
 
 from steam_workshop_dl.app import downloader as downloader_module
 from steam_workshop_dl.app.downloader import Downloader
@@ -131,3 +132,37 @@ def test_handle_line_ignores_progress_between_items() -> None:
 
     assert events.progress == []
     assert node.status is ItemStatus.PENDING
+
+
+def test_worker_count_modes() -> None:
+    assert Downloader._worker_count(Settings(download_threads=1), 5) == 1
+    assert Downloader._worker_count(Settings(download_threads=3), 5) == 3
+    assert Downloader._worker_count(Settings(download_threads=4), 2) == 2
+    assert (
+        Downloader._worker_count(
+            Settings(download_threads=0, unstable=True), 7
+        )
+        == 7
+    )
+    assert Downloader._worker_count(Settings(download_threads=0), 7) == 1
+
+
+def test_download_parallel_runs_workers_concurrently(monkeypatch) -> None:
+    nodes = [make_node("111", "First"), make_node("222", "Second")]
+    barrier = Barrier(2)
+
+    def fake_single(self, steamcmd, node, settings, events, cancel):
+        barrier.wait(timeout=5)
+        return None
+
+    monkeypatch.setattr(Downloader, "_download_single", fake_single)
+    found = Downloader()._download_parallel(
+        Path("/bin/true"),
+        nodes,
+        Settings(download_threads=2),
+        NullEvents(),
+        Event(),
+        2,
+    )
+
+    assert found == {"111": None, "222": None}

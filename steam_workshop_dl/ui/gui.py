@@ -136,6 +136,17 @@ class App(tk.Tk):
         self.validate = tk.BooleanVar(value=False)
         self.zip_items = tk.BooleanVar(value=False)
         self.bootstrap_steamcmd = tk.BooleanVar(value=True)
+        saved_threads = preferences.get("download_threads", 1)
+        try:
+            saved_threads = int(saved_threads)
+        except (TypeError, ValueError):
+            saved_threads = 1
+        if saved_threads not in {0, 1, 2, 3, 4}:
+            saved_threads = 1
+        self.unstable = tk.BooleanVar(value=bool(preferences.get("unstable", False)))
+        if saved_threads == 0 and not self.unstable.get():
+            saved_threads = 1
+        self.download_threads = tk.IntVar(value=saved_threads)
         self.status = tk.StringVar(value=self.t("ready"))
         self.totals = tk.StringVar(value=self.t("list_not_loaded"))
 
@@ -429,6 +440,51 @@ class App(tk.Tk):
 
         options = ttk.LabelFrame(body, text=t("options"), padding=8)
         options.pack(fill="x", pady=(10, 0))
+
+        threads_row = ttk.Frame(options)
+        threads_row.pack(fill="x")
+        ttk.Label(threads_row, text=t("threads")).pack(side="left")
+
+        def thread_labels() -> dict[str, str]:
+            labels = {str(number): str(number) for number in range(1, 5)}
+            if self.unstable.get():
+                labels[t("threads_each_mod")] = "0"
+            return labels
+
+        labels = thread_labels()
+        code_to_label = {code: label for label, code in labels.items()}
+        current_threads = str(self.download_threads.get())
+        if current_threads not in code_to_label:
+            current_threads = "4" if self.unstable.get() else "1"
+        threads_text = tk.StringVar(value=code_to_label[current_threads])
+        threads_combo = ttk.Combobox(
+            threads_row,
+            textvariable=threads_text,
+            values=list(labels),
+            state="readonly",
+            width=24,
+        )
+        threads_combo.pack(side="left", padx=(8, 0))
+
+        def refresh_threads() -> None:
+            mapping = thread_labels()
+            threads_combo.configure(values=list(mapping))
+            if threads_text.get() not in mapping:
+                threads_text.set("4" if self.unstable.get() else "1")
+
+        ttk.Label(
+            options, text=t("threads_hint"), foreground="#666666"
+        ).pack(anchor="w", pady=(4, 6))
+        ttk.Checkbutton(
+            options,
+            text=t("unstable"),
+            variable=self.unstable,
+            command=refresh_threads,
+        ).pack(anchor="w")
+        ttk.Label(
+            options, text=t("unstable_hint"), foreground="#666666"
+        ).pack(anchor="w", pady=(0, 8))
+
         for key, variable in (
             ("resume", self.resume),
             ("validate", self.validate),
@@ -444,6 +500,8 @@ class App(tk.Tk):
             self.resume,
             self.validate,
             self.zip_items,
+            self.download_threads,
+            self.unstable,
         )
         before = [(variable, variable.get()) for variable in variables]
 
@@ -453,27 +511,27 @@ class App(tk.Tk):
             dialog.destroy()
 
         def save() -> None:
+            selected_threads = thread_labels().get(threads_text.get(), "1")
             code = codes.get(language_name.get(), self.language.get())
             chosen_theme = theme_codes.get(theme_name.get(), self.theme.get())
-            changed = False
             if code != self.language.get():
                 self.language.set(code)
                 self._apply_language()
-                changed = True
             if chosen_theme != self.theme.get():
                 self.theme.set(chosen_theme)
                 self._apply_theme()
-                changed = True
-            if changed:
-                try:
-                    save_gui_preferences(
-                        {
-                            "language": self.language.get(),
-                            "theme": self.theme.get(),
-                        }
-                    )
-                except OSError:
-                    pass
+            self.download_threads.set(int(selected_threads))
+            try:
+                save_gui_preferences(
+                    {
+                        "language": self.language.get(),
+                        "theme": self.theme.get(),
+                        "download_threads": int(selected_threads),
+                        "unstable": bool(self.unstable.get()),
+                    }
+                )
+            except OSError:
+                pass
             dialog.destroy()
 
         ttk.Button(body, text=t("cancel"), command=cancel).pack(
@@ -501,6 +559,8 @@ class App(tk.Tk):
             resume=self.resume.get(),
             validate=self.validate.get(),
             zip_items=self.zip_items.get(),
+            download_threads=self.download_threads.get(),
+            unstable=self.unstable.get(),
         )
 
     # ------------------------------------------------------------------ actions

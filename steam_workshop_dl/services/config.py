@@ -166,6 +166,8 @@ def settings_from_mapping(data: Mapping[str, Any]) -> Settings:
         force=bool(pick("force", default=False)),
         retries=int(pick("retries", default=2)),
         metadata_workers=int(pick("jobs", "metadata_workers", default=4)),
+        download_threads=int(pick("threads", "download_threads", default=1)),
+        unstable=bool(pick("unstable", default=False)),
         timeout=float(pick("timeout", default=30.0)),
         dry_run=bool(pick("dry_run", default=False)),
         only=id_set(only),

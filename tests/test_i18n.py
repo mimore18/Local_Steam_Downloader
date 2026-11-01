@@ -207,7 +207,7 @@ def test_gui_theme_switch_and_persistence(app) -> None:
     combos = [
         widget for widget in _walk(dialog) if isinstance(widget, tk.ttk.Combobox)
     ]
-    assert len(combos) == 2
+    assert len(combos) == 3
     combos[1].set("Тёмная")
     save = next(
         widget
@@ -258,6 +258,56 @@ def test_gui_progress_tracks_item_percent(app) -> None:
 
     assert float(instance.progress.cget("value")) == 150.0
     assert instance.status.get() == "Скачивание: 75%"
+
+
+def test_gui_threads_and_unstable_settings(app) -> None:
+    import json
+
+    instance, config_dir = app
+    assert instance.download_threads.get() == 1
+    assert instance.unstable.get() is False
+
+    instance._open_settings()
+    dialog = next(
+        widget
+        for widget in instance.winfo_children()
+        if isinstance(widget, tk.Toplevel)
+    )
+    combos = [
+        widget for widget in _walk(dialog) if isinstance(widget, tk.ttk.Combobox)
+    ]
+    threads_combo = combos[2]
+    assert list(threads_combo.cget("values")) == ["1", "2", "3", "4"]
+
+    unstable = next(
+        widget
+        for widget in _walk(dialog)
+        if isinstance(widget, tk.ttk.Checkbutton)
+        and widget.cget("text") == "Нестабильный режим"
+    )
+    unstable.invoke()
+    assert "Каждый мод отдельно" in list(threads_combo.cget("values"))
+
+    threads_combo.set("Каждый мод отдельно")
+    save = next(
+        widget
+        for widget in _walk(dialog)
+        if isinstance(widget, tk.ttk.Button)
+        and widget.cget("text") in {"Сохранить", "Save"}
+    )
+    save.invoke()
+    instance.update()
+
+    assert instance.download_threads.get() == 0
+    assert instance.unstable.get() is True
+    settings = instance._settings()
+    assert settings.download_threads == 0
+    assert settings.unstable is True
+
+    preferences = config_dir / "steam-workshop-dl" / "gui.json"
+    data = json.loads(preferences.read_text(encoding="utf-8"))
+    assert data["download_threads"] == 0
+    assert data["unstable"] is True
 
 
 def test_gui_remembers_saved_theme(app) -> None:

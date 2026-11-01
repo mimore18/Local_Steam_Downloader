@@ -13,6 +13,7 @@ import tempfile
 import threading
 import time
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from ..core.errors import DownloadError
@@ -161,6 +162,14 @@ class Downloader:
         events.finished(summary)
         return summary
 
+    @staticmethod
+    def _worker_count(settings: Settings, item_count: int) -> int:
+        if item_count <= 1:
+            return 1
+        if settings.unstable and settings.download_threads == 0:
+            return item_count
+        return max(1, min(settings.download_threads, item_count))
+
     def _download_pass(
         self,
         steamcmd: Path,
@@ -169,8 +178,32 @@ class Downloader:
         events: Events,
         cancel: threading.Event,
     ) -> dict[str, Path | None]:
-        """Run one SteamCMD batch and return item_id -> source path."""
+        """Run one SteamCMD pass and return item_id -> source path."""
 
+        workers = self._worker_count(settings, len(items))
+        if workers == 1:
+            found = self._download_batch(steamcmd, items, settings, events, cancel)
+        else:
+            if settings.unstable and settings.download_threads == 0:
+                events.log(
+                    "info",
+                    f"Нестабильный режим: {workers} SteamCMD одновременно.",
+                )
+            else:
+                events.log("info", f"Параллельная загрузка: {workers} поток(ов).")
+            found = self._download_parallel(
+                steamcmd, items, settings, events, cancel, workers
+            )
+        return self._apply_fallbacks(steamcmd, items, found)
+
+    def _download_batch(
+        self,
+        steamcmd: Path,
+        items: list[WorkshopNode],
+        settings: Settings,
+        events: Events,
+        cancel: threading.Event,
+    ) -> dict[str, Path | None]:
         found: dict[str, Path | None] = {node.id: None for node in items}
         by_id = {node.id: node for node in items}
         state: dict[str, object] = {"current": None, "percent": {}}
@@ -194,8 +227,70 @@ class Downloader:
                 )
             except OSError as exc:
                 events.log("error", f"SteamCMD не запустился: {exc}")
-                return found
+        return found
 
+    def _download_parallel(
+        self,
+        steamcmd: Path,
+        items: list[WorkshopNode],
+        settings: Settings,
+        events: Events,
+        cancel: threading.Event,
+        workers: int,
+    ) -> dict[str, Path | None]:
+        def run_one(node: WorkshopNode) -> tuple[str, Path | None]:
+            if cancel.is_set():
+                return node.id, None
+            return node.id, self._download_single(
+                steamcmd, node, settings, events, cancel
+            )
+
+        found: dict[str, Path | None] = {node.id: None for node in items}
+        with ThreadPoolExecutor(
+            max_workers=workers, thread_name_prefix="swdl"
+        ) as pool:
+            for item_id, path in pool.map(run_one, items):
+                found[item_id] = path
+        return found
+
+    def _download_single(
+        self,
+        steamcmd: Path,
+        node: WorkshopNode,
+        settings: Settings,
+        events: Events,
+        cancel: threading.Event,
+    ) -> Path | None:
+        found: dict[str, Path | None] = {node.id: None}
+        state: dict[str, object] = {"current": node.id, "percent": {}}
+        with tempfile.TemporaryDirectory(prefix="swdl-") as tmp:
+            script = Path(tmp) / "download.txt"
+            write_runscript(
+                script,
+                [node],
+                auth_mode=settings.auth_mode,
+                username=settings.username,
+                validate=settings.validate,
+            )
+            try:
+                run_script(
+                    steamcmd,
+                    script,
+                    on_line=lambda line: self._handle_line(
+                        line, found, {node.id: node}, state, events
+                    ),
+                    cancel=cancel.is_set,
+                )
+            except OSError as exc:
+                events.log("error", f"SteamCMD не запустился: {exc}")
+        return found[node.id]
+
+    @staticmethod
+    def _apply_fallbacks(
+        steamcmd: Path,
+        items: list[WorkshopNode],
+        found: dict[str, Path | None],
+    ) -> dict[str, Path | None]:
         fallbacks = {
             node.id: content_path(steamcmd, node.appid, node.id)
             for node in items
